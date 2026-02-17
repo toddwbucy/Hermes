@@ -444,12 +444,12 @@ func (p *Plugin) Commands() []plugin.Command {
 	case viewNotesModal:
 		return []plugin.Command{
 			{ID: "save", Name: "Save", Description: "Save note (ctrl+s)", Context: pluginID, Priority: 1},
-			{ID: "cancel", Name: "Cancel", Description: "Close modal", Context: pluginID, Priority: 2},
+			{ID: "back", Name: "Cancel", Description: "Close modal", Context: pluginID, Priority: 2},
 		}
 	case viewStatusModal:
 		return []plugin.Command{
 			{ID: "select", Name: "Select", Description: "Choose status", Context: pluginID, Priority: 1},
-			{ID: "cancel", Name: "Cancel", Description: "Close modal", Context: pluginID, Priority: 2},
+			{ID: "back", Name: "Cancel", Description: "Close modal", Context: pluginID, Priority: 2},
 		}
 	}
 

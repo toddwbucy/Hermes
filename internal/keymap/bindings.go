@@ -415,7 +415,6 @@ func DefaultBindings() []Binding {
 		{Key: "n", Command: "note", Context: "persephone"},
 		{Key: "ctrl+s", Command: "save", Context: "persephone"},
 		{Key: "tab", Command: "select", Context: "persephone"},
-		{Key: "esc", Command: "cancel", Context: "persephone"},
 
 		// Notes list context
 		{Key: "j", Command: "cursor-down", Context: "notes-list"},
