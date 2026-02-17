@@ -208,18 +208,13 @@ func (g *Gradient) PositionAt(x, y, width, height int) float64 {
 	}
 
 	// Convert angle to radians
-	// We use negative angle because screen Y increases downward
 	angleRad := g.Angle * math.Pi / 180.0
 
-	// Calculate the gradient direction vector
-	// For 0 degrees: horizontal (1, 0)
-	// For 90 degrees: vertical (0, 1)
-	// For 30 degrees: diagonal
+	// Gradient direction vector
 	dx := math.Cos(angleRad)
 	dy := math.Sin(angleRad)
 
-	// Project the point onto the gradient direction
-	// Normalize coordinates to [0, 1] range first
+	// Normalize coordinates to [0, 1] range
 	var nx, ny float64
 	if width > 1 {
 		nx = float64(x) / float64(width-1)
@@ -231,10 +226,30 @@ func (g *Gradient) PositionAt(x, y, width, height int) float64 {
 	// Project point onto gradient line
 	projection := nx*dx + ny*dy
 
-	// Normalize to [0, 1] based on the maximum possible projection
-	maxProjection := math.Abs(dx) + math.Abs(dy)
-	if maxProjection > 0 {
-		projection = projection / maxProjection
+	// Compute min/max projection across the four normalized corners
+	// to correctly handle all angles including 180° and 270°.
+	corners := [4]float64{
+		0*dx + 0*dy, // (0,0)
+		1*dx + 0*dy, // (1,0)
+		0*dx + 1*dy, // (0,1)
+		1*dx + 1*dy, // (1,1)
+	}
+	minP, maxP := corners[0], corners[0]
+	for _, c := range corners[1:] {
+		if c < minP {
+			minP = c
+		}
+		if c > maxP {
+			maxP = c
+		}
+	}
+
+	// Normalize to [0, 1] based on the actual projection range
+	span := maxP - minP
+	if span > 0 {
+		projection = (projection - minP) / span
+	} else {
+		projection = 0.5
 	}
 
 	// Clamp to [0, 1]

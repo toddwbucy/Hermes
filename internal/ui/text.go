@@ -160,8 +160,12 @@ func BytePosToRunePos(s string, bytePos int) int {
 
 	pos := 0
 	for i := range s {
-		if i >= bytePos {
+		if i == bytePos {
 			return pos
+		}
+		if i > bytePos {
+			// bytePos falls mid-rune; return the containing rune
+			return pos - 1
 		}
 		pos++
 	}
@@ -185,13 +189,7 @@ func TruncateStart(s string, width int) string {
     
     targetWidth := width - 3
     runes := []rune(s)
-    
-    // Calculate total width first
-    totalWidth := 0
-    for _, r := range runes {
-        totalWidth += runewidth.RuneWidth(r)
-    }
-    
+
     // Scan from end
     currentWidth := 0
     for i := len(runes) - 1; i >= 0; i-- {
