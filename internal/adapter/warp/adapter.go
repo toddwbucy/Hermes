@@ -38,7 +38,10 @@ type Adapter struct {
 
 // New creates a new Warp adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	dbPath := findWarpDB(home)
 	return &Adapter{
 		dbPath:       dbPath,
@@ -603,17 +606,19 @@ func shortConversationID(id string) string {
 	return id
 }
 
-// truncateText truncates text to maxLen, adding "..." if truncated.
+// truncateText truncates text to maxLen runes, adding "..." if truncated.
+// Uses rune-based length to avoid splitting multibyte UTF-8 characters.
 func truncateText(s string, maxLen int) string {
 	// Replace newlines with spaces for display
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // stripANSI removes ANSI escape codes from text.
