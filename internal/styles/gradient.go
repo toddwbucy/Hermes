@@ -228,11 +228,19 @@ func (g *Gradient) PositionAt(x, y, width, height int) float64 {
 
 	// Compute min/max projection across the four normalized corners
 	// to correctly handle all angles including 180° and 270°.
+	// Use actual reachable coordinates for 1-row/1-col gradients.
+	x1, y1 := 1.0, 1.0
+	if width <= 1 {
+		x1 = 0
+	}
+	if height <= 1 {
+		y1 = 0
+	}
 	corners := [4]float64{
-		0*dx + 0*dy, // (0,0)
-		1*dx + 0*dy, // (1,0)
-		0*dx + 1*dy, // (0,1)
-		1*dx + 1*dy, // (1,1)
+		0*dx + 0*dy,   // (0,0)
+		x1*dx + 0*dy,  // (x1,0)
+		0*dx + y1*dy,  // (0,y1)
+		x1*dx + y1*dy, // (x1,y1)
 	}
 	minP, maxP := corners[0], corners[0]
 	for _, c := range corners[1:] {

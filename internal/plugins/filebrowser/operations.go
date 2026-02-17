@@ -123,12 +123,14 @@ func (p *Plugin) validateDestPath(dstPath string) error {
 		return fmt.Errorf("failed to resolve work directory")
 	}
 
-	// Resolve symlinks in destination parent (dst itself may not exist yet)
-	dstParent, err := filepath.EvalSymlinks(filepath.Dir(absDst))
-	if err != nil {
+	// Resolve symlinks in destination parent (dst itself may not exist yet).
+	// Walk up to the nearest existing ancestor to handle move-to-new-dir.
+	dstDir := filepath.Dir(absDst)
+	resolvedDir, remainder := resolveExistingAncestor(dstDir)
+	if resolvedDir == "" {
 		return fmt.Errorf("invalid destination path")
 	}
-	absDst = filepath.Join(dstParent, filepath.Base(absDst))
+	absDst = filepath.Join(resolvedDir, remainder, filepath.Base(absDst))
 
 	// Check if destination is within workdir
 	relPath, err := filepath.Rel(absWorkDir, absDst)
@@ -137,6 +139,29 @@ func (p *Plugin) validateDestPath(dstPath string) error {
 	}
 
 	return nil
+}
+
+// resolveExistingAncestor walks up from dir until it finds an existing ancestor,
+// resolves symlinks on that ancestor, and returns (resolved, remainder).
+// This supports move-to-new-dir where the destination parent doesn't exist yet.
+func resolveExistingAncestor(dir string) (resolved, remainder string) {
+	current := dir
+	var parts []string
+	for {
+		resolved, err := filepath.EvalSymlinks(current)
+		if err == nil {
+			return resolved, filepath.Join(parts...)
+		}
+		if !os.IsNotExist(err) {
+			return "", ""
+		}
+		parts = append([]string{filepath.Base(current)}, parts...)
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", ""
+		}
+		current = parent
+	}
 }
 
 // validateFilename checks for invalid filename characters and patterns.
