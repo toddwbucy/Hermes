@@ -205,17 +205,19 @@ current_step = work_order["state"]["current_step"]
 
 ```python
 # After completing step 6:
+# NOTE: UPDATE WITH does shallow merge — nested objects get replaced, not merged.
+# Use MERGE() at each nesting level to preserve sibling fields.
 db.aql("""
   FOR doc IN persephone_tasks
     FILTER doc._key == @key
     UPDATE doc WITH {
-      work_order: {
-        state: {
+      work_order: MERGE(doc.work_order, {
+        state: MERGE(doc.work_order.state, {
           current_step: 6,
           completed_steps: APPEND(doc.work_order.state.completed_steps, [6]),
           pr_url: @pr_url
-        }
-      },
+        })
+      }),
       updated_at: DATE_ISO8601(DATE_NOW())
     } IN persephone_tasks
 """, bind_vars={"key": task_key, "pr_url": url})
