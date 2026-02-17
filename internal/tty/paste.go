@@ -50,6 +50,8 @@ func SendBracketedPasteToTmux(sessionName, text string) error {
 
 	// Send the actual text
 	if err := SendLiteralToTmux(sessionName, text); err != nil {
+		// Attempt to close bracketed paste to avoid leaving terminal in inconsistent state
+		_ = SendLiteralToTmux(sessionName, BracketedPasteEnd)
 		return err
 	}
 
@@ -93,8 +95,11 @@ func SendPasteInputCmd(sessionName, text string, bracketed bool) tea.Cmd {
 		} else {
 			err = SendPasteToTmux(sessionName, text)
 		}
-		if err != nil && IsSessionDeadError(err) {
-			return SessionDeadMsg{}
+		if err != nil {
+			if IsSessionDeadError(err) {
+				return SessionDeadMsg{}
+			}
+			return PasteResultMsg{Err: err}
 		}
 		return nil
 	}
