@@ -171,9 +171,7 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 
 	sessions := make([]adapter.Session, 0, len(entries))
 	seenPaths := make(map[string]struct{}, len(entries))
-	a.sessionIdxMu.Lock()
-	a.sessionIndex = make(map[string]string)
-	a.sessionIdxMu.Unlock()
+	localIdx := make(map[string]string, len(entries))
 
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".json") {
@@ -193,10 +191,8 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 			continue
 		}
 
-		// Store in index for Messages() lookup
-		a.sessionIdxMu.Lock()
-		a.sessionIndex[meta.SessionID] = projectID
-		a.sessionIdxMu.Unlock()
+		// Build local index for atomic swap after loop
+		localIdx[meta.SessionID] = projectID
 
 		// Determine name - use title, first user message, or short ID
 		name := meta.Title
@@ -225,6 +221,11 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 			Path:         path,        // td-dca6fe: tiered watching needs session file path
 		})
 	}
+
+	// Atomic swap of session index — readers see old or new, never empty
+	a.sessionIdxMu.Lock()
+	a.sessionIndex = localIdx
+	a.sessionIdxMu.Unlock()
 
 	// Sort by UpdatedAt descending (newest first)
 	sort.Slice(sessions, func(i, j int) bool {
@@ -283,13 +284,12 @@ func (a *Adapter) Messages(sessionID string) ([]adapter.Message, error) {
 		}
 
 		adapterMsg := adapter.Message{
-			ID:             msg.ID,
-			Role:           msg.Role,
-			Content:        strings.Join(contentParts, "\n"),
-			Timestamp:      msg.Time.CreatedTime(),
-			Model:          model,
-			ToolUses:       parts.toolUses,
-			ThinkingBlocks: parts.thinkingBlocks,
+			ID:        msg.ID,
+			Role:      msg.Role,
+			Content:   strings.Join(contentParts, "\n"),
+			Timestamp: msg.Time.CreatedTime(),
+			Model:     model,
+			ToolUses:  parts.toolUses,
 		}
 
 		// Add token usage
@@ -602,11 +602,10 @@ func (a *Adapter) parseSessionFile(path, projectID string) (*SessionMetadata, er
 
 // parsedParts holds the aggregated parts data for a message.
 type parsedParts struct {
-	content        string
-	toolUses       []adapter.ToolUse
-	thinkingBlocks []adapter.ThinkingBlock
-	fileRefs       []string
-	patchFiles     []string
+	content    string
+	toolUses   []adapter.ToolUse
+	fileRefs   []string
+	patchFiles []string
 }
 
 // batchReadMessages reads all message files from a directory and parses them.
@@ -772,6 +771,9 @@ func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
+	if maxLen <= 0 {
+		return ""
+	}
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

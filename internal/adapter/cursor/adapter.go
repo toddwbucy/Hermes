@@ -647,8 +647,9 @@ func extractToolResultContent(result json.RawMessage) string {
 
 	// Fallback: return raw JSON (truncated if too long)
 	raw := string(result)
-	if len(raw) > 500 {
-		return raw[:497] + "..."
+	runes := []rune(raw)
+	if len(runes) > 500 {
+		return string(runes[:497]) + "..."
 	}
 	return raw
 }
@@ -669,6 +670,9 @@ func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
+	if maxLen <= 0 {
+		return ""
+	}
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

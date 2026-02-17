@@ -206,23 +206,69 @@ current_step = work_order["state"]["current_step"]
 ```python
 # After completing step 6:
 db.aql("""
-  UPDATE @key WITH {
-    work_order: {
-      state: {
-        current_step: 6,
-        completed_steps: APPEND(doc.work_order.state.completed_steps, [6]),
-        pr_url: @pr_url
-      }
-    },
-    updated_at: DATE_ISO8601(DATE_NOW())
-  } IN persephone_tasks
+  FOR doc IN persephone_tasks
+    FILTER doc._key == @key
+    UPDATE doc WITH {
+      work_order: {
+        state: {
+          current_step: 6,
+          completed_steps: APPEND(doc.work_order.state.completed_steps, [6]),
+          pr_url: @pr_url
+        }
+      },
+      updated_at: DATE_ISO8601(DATE_NOW())
+    } IN persephone_tasks
 """, bind_vars={"key": task_key, "pr_url": url})
 ```
+
+## Security
+
+### Procedure Placeholders
+
+The `procedure` array uses angle-bracket placeholders like `<pr_title>`, `<file_manifest>`,
+`<body>`, and `<pr_number>` in `command` fields. **These must never be directly interpolated
+into shell command strings.** Unsafe substitution enables command injection and path traversal.
+
+**Risks by placeholder:**
+- `<pr_title>`, `<body>`: Arbitrary text — shell metacharacters (`;`, `$()`, backticks) allow command injection
+- `<file_manifest>`: File paths — `../` sequences allow path traversal outside the worktree
+- `<pr_number>`: Numeric — but unsanitized input could carry non-numeric payloads
+
+**Required patterns:**
+1. **Never use `shell=True` or string concatenation** to build commands. Use `exec`-with-arg-array
+   (`subprocess.run(["git", "commit", "-m", title])`) or Git library calls.
+2. **Use `--` to separate flags from paths** in git commands: `git checkout main -- <paths>`
+3. **Validate and allowlist `file_manifest` entries**: reject paths containing `..`, normalize
+   with `os.path.normpath`, and verify each path is within the expected worktree.
+4. **Validate `pr_number`** as a positive integer before use.
+5. **Quote or escape arguments** when shell invocation is unavoidable (not recommended).
+
+**Implementer checklist:**
+- [ ] All `command` templates use arg-array execution, not shell string interpolation
+- [ ] File paths from `inputs.file_manifest` are normalized and confined to worktree
+- [ ] `inputs.pr_number` is validated as a positive integer
+- [ ] Free-text fields (`pr_title`, `body`) are passed as arguments, never embedded in shell strings
+- [ ] Commands use `--` before path arguments where supported
+
+### Schema Extension Security
+
+When extending the `work_order` schema:
+- **`inputs`**: Validate and sanitize all shapes. Type-check fields; reject unexpected types.
+- **`procedure.action`**: Restrict to an allowlist of known action types. Unknown actions must
+  be rejected, not silently executed.
+- **`context`**: Annotate with provenance (who created, when, auth scope). Do not trust
+  `context` fields from untrusted sources without verification.
+- **`state`**: Version state schemas to avoid unsafe migrations. Validate state shape on read;
+  reject or migrate incompatible versions rather than silently proceeding.
+- **Executable actions**: Enforce least privilege and sandboxing. Agents executing `procedure`
+  steps should run in confined environments (chroot, container, restricted user) and only have
+  access to resources declared in `context`.
+- **Audit**: Log all state mutations and procedure step executions with agent identity and timestamp.
 
 ## Extensibility
 
 The `work_order` object is designed for compositional growth:
-- Different task types have different `inputs` shapes
-- `procedure` steps can be extended with new `action` types
+- Different task types have different `inputs` shapes (validate per-type)
+- `procedure` steps can be extended with new `action` types (allowlist required — see Security)
 - `context` can be extended for non-code tasks (e.g., database migrations, deployments)
-- `state` tracks whatever the agent needs for resumability
+- `state` tracks whatever the agent needs for resumability (version for compatibility)
