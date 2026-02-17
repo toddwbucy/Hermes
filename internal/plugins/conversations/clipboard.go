@@ -182,7 +182,7 @@ func formatSessionSummary(s *sessionRef) string {
 			sb.WriteString(fmt.Sprintf("- **Tokens:** %d\n", s.Tokens))
 		}
 		if s.EstCost > 0 {
-			sb.WriteString(fmt.Sprintf("- **Est. Cost:** $%.4f\n", s.EstCost))
+			sb.WriteString(fmt.Sprintf("- **Est. Cost:** $%.2f\n", s.EstCost))
 		}
 	}
 

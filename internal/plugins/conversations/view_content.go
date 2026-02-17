@@ -903,7 +903,11 @@ func (p *Plugin) renderToolUseBlock(block adapter.ContentBlock, maxWidth int) []
 	toolHeader := icon + " " + toolName
 
 	// Try to extract a meaningful command preview
-	cmdPreview := extractToolCommand(block.ToolName, block.ToolInput, maxWidth-len(toolHeader)-5)
+	available := maxWidth - len(toolHeader) - 5
+	if available < 4 {
+		available = 4
+	}
+	cmdPreview := extractToolCommand(block.ToolName, block.ToolInput, available)
 	if cmdPreview == "" {
 		// Fall back to file_path extraction
 		if filePath := extractFilePath(block.ToolInput); filePath != "" {
@@ -973,8 +977,16 @@ func (p *Plugin) renderToolUseBlock(block adapter.ContentBlock, maxWidth int) []
 		}
 		if preview != "" {
 			// Show first meaningful line as preview (rune-safe for Unicode)
-			if runes := []rune(preview); len(runes) > maxWidth-6 {
-				preview = string(runes[:maxWidth-9]) + "..."
+			maxPreview := maxWidth - 6
+			if maxPreview < 4 {
+				maxPreview = 4
+			}
+			if runes := []rune(preview); len(runes) > maxPreview {
+				cut := maxPreview - 3
+				if cut < 1 {
+					cut = 1
+				}
+				preview = string(runes[:cut]) + "..."
 			}
 			lines = append(lines, styles.Muted.Render("  → "+preview))
 		}

@@ -114,7 +114,11 @@ func (p *Plugin) resumeSessionInfoSection() modal.Section {
 				name = p.resumeSession.Slug
 			}
 			if name == "" {
-				name = p.resumeSession.ID[:min(12, len(p.resumeSession.ID))]
+				idLen := len(p.resumeSession.ID)
+				if idLen > 12 {
+					idLen = 12
+				}
+				name = p.resumeSession.ID[:idLen]
 			}
 			adapterName := p.resumeSession.AdapterName
 			if adapterName == "" {

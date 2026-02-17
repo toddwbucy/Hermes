@@ -15,7 +15,6 @@ import (
 	"github.com/toddwbucy/hermes/internal/styles"
 )
 
-
 // renderContentSearchModal renders the content search modal.
 // This creates a modal with search input, options, results, and stats sections.
 func renderContentSearchModal(state *ContentSearchState, width, height int) string {
@@ -61,8 +60,8 @@ func contentSearchHeaderSection(state *ContentSearchState, contentWidth int) mod
 			sb.WriteString(styles.Subtitle.Render("Search: "))
 
 			query := state.Query
-			if len(query) > contentWidth-12 {
-				query = query[:contentWidth-15] + "..."
+			if queryRunes := []rune(query); len(queryRunes) > contentWidth-12 {
+				query = string(queryRunes[:contentWidth-15]) + "..."
 			}
 			sb.WriteString(styles.Body.Render(query))
 			sb.WriteString(styles.StatusInProgress.Render("\u2588")) // Block cursor
@@ -77,8 +76,8 @@ func contentSearchHeaderSection(state *ContentSearchState, contentWidth int) mod
 			if state.Error != "" {
 				sb.WriteString("\n")
 				errMsg := state.Error
-				if len(errMsg) > contentWidth {
-					errMsg = errMsg[:contentWidth-3] + "..."
+				if errRunes := []rune(errMsg); len(errRunes) > contentWidth {
+					errMsg = string(errRunes[:contentWidth-3]) + "..."
 				}
 				sb.WriteString(styles.StatusDeleted.Render(errMsg))
 			}
@@ -692,4 +691,3 @@ func byteToRuneIndex(s string, byteIdx int) int {
 	}
 	return utf8.RuneCountInString(s[:byteIdx])
 }
-

@@ -69,10 +69,11 @@ func ComputeSessionSummary(messages []adapter.Message, duration time.Duration) S
 		}
 	}
 
-	// Calculate cost
+	// Calculate cost — pass base input tokens (excluding cache) to avoid double-counting
+	baseInputTokens := summary.TotalTokensIn - summary.TotalCacheRead - summary.TotalCacheWrite
 	summary.TotalCost = estimateTotalCost(
 		summary.PrimaryModel,
-		summary.TotalTokensIn,
+		baseInputTokens,
 		summary.TotalTokensOut,
 		summary.TotalCacheRead,
 		summary.TotalCacheWrite,
@@ -98,6 +99,9 @@ func UpdateSessionSummary(summary *SessionSummary, newMessages []adapter.Message
 		for _, fp := range summary.FilesTouched {
 			fileSet[fp] = true
 		}
+	}
+	if summary.ToolCounts == nil {
+		summary.ToolCounts = make(map[string]int)
 	}
 
 	for _, msg := range newMessages {
@@ -133,10 +137,11 @@ func UpdateSessionSummary(summary *SessionSummary, newMessages []adapter.Message
 
 	summary.FileCount = len(summary.FilesTouched)
 
-	// Recalculate cost
+	// Recalculate cost — pass base input tokens (excluding cache) to avoid double-counting
+	baseInputTokens := summary.TotalTokensIn - summary.TotalCacheRead - summary.TotalCacheWrite
 	summary.TotalCost = estimateTotalCost(
 		summary.PrimaryModel,
-		summary.TotalTokensIn,
+		baseInputTokens,
 		summary.TotalTokensOut,
 		summary.TotalCacheRead,
 		summary.TotalCacheWrite,

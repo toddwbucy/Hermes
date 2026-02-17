@@ -248,8 +248,9 @@ func (p *Plugin) loadMessages(sessionID string) tea.Cmd {
 	}
 
 	offset := p.messageOffset
+	adapters := p.adapters // capture to avoid race in closure
 	return func() tea.Msg {
-		if len(p.adapters) == 0 {
+		if len(adapters) == 0 {
 			return MessagesLoadedMsg{Epoch: epoch}
 		}
 		adapter := p.adapterForSession(sessionID)

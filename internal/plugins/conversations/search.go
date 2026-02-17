@@ -105,6 +105,10 @@ func (f *SearchFilters) HasCategory(cat string) bool {
 
 // SetDateRange sets the date range preset.
 func (f *SearchFilters) SetDateRange(preset string) {
+	if preset == "all" {
+		f.DateRange = DateRange{}
+		return
+	}
 	if f.DateRange.Preset == preset {
 		f.DateRange.Preset = "" // Toggle off
 		return
