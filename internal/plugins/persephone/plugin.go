@@ -30,6 +30,7 @@ const (
 	viewBoard viewState = iota
 	viewDetail
 	viewStatusModal
+	viewNotesModal
 	viewSetup
 	viewNotConnected
 )
@@ -49,6 +50,7 @@ type Plugin struct {
 	detail    *detailModel
 	setup     *setupModel
 	statusMdl *statusModal
+	notesMdl  *notesModal
 
 	// Mouse support
 	mouseHandler *mouse.Handler
@@ -171,6 +173,19 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		}
 		return p, p.Start()
 
+	case taskNoteAddedMsg:
+		p.view = viewDetail
+		p.notesMdl = nil
+		if msg.err != nil {
+			p.ctx.Logger.Warn("persephone: note add failed", "error", msg.err)
+			return p, appmsg.ShowToast("Error: "+msg.err.Error(), 3*time.Second)
+		}
+		return p, tea.Batch(
+			p.fetchTasks(),
+			p.fetchTaskDetail(msg.taskKey),
+			appmsg.ShowToast("Note saved", 2*time.Second),
+		)
+
 	case taskStatusChangedMsg:
 		p.view = viewDetail
 		p.statusMdl = nil
@@ -233,6 +248,11 @@ func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 					p.view = viewStatusModal
 				}
 			}
+		case "n":
+			if t := p.detail.task; t != nil {
+				p.notesMdl = newNotesModal(t.Key)
+				p.view = viewNotesModal
+			}
 		}
 
 	case viewStatusModal:
@@ -246,6 +266,28 @@ func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 			case "cancel":
 				p.view = viewDetail
 				p.statusMdl = nil
+			}
+			return p, cmd
+		}
+
+	case viewNotesModal:
+		if p.notesMdl != nil {
+			action, cmd := p.notesMdl.handleKey(msg)
+			switch action {
+			case "save":
+				content := p.notesMdl.noteContent()
+				if content == "" {
+					return p, appmsg.ShowToast("Note is empty", 2*time.Second)
+				}
+				note := persephoneData.TaskNote{
+					Content:   content,
+					Author:    "hermes-ui",
+					CreatedAt: time.Now().UTC(),
+				}
+				return p, p.appendNote(p.notesMdl.taskKey, note)
+			case "cancel":
+				p.view = viewDetail
+				p.notesMdl = nil
 			}
 			return p, cmd
 		}
@@ -311,6 +353,27 @@ func (p *Plugin) handleMouse(msg tea.MouseMsg) (plugin.Plugin, tea.Cmd) {
 				p.statusMdl = nil
 			}
 		}
+
+	case viewNotesModal:
+		if p.notesMdl != nil && p.notesMdl.m != nil {
+			action := p.notesMdl.m.HandleMouse(msg, p.notesMdl.mouseHandler)
+			switch action {
+			case "save":
+				content := p.notesMdl.noteContent()
+				if content == "" {
+					return p, appmsg.ShowToast("Note is empty", 2*time.Second)
+				}
+				note := persephoneData.TaskNote{
+					Content:   content,
+					Author:    "hermes-ui",
+					CreatedAt: time.Now().UTC(),
+				}
+				return p, p.appendNote(p.notesMdl.taskKey, note)
+			case "cancel":
+				p.view = viewDetail
+				p.notesMdl = nil
+			}
+		}
 	}
 
 	return p, nil
@@ -330,6 +393,12 @@ func (p *Plugin) View(width, height int) string {
 		bg := p.detail.view(width, height)
 		if p.statusMdl != nil {
 			return p.statusMdl.render(bg, width, height)
+		}
+		return bg
+	case viewNotesModal:
+		bg := p.detail.view(width, height)
+		if p.notesMdl != nil {
+			return p.notesMdl.render(bg, width, height)
 		}
 		return bg
 	case viewSetup:
@@ -367,6 +436,12 @@ func (p *Plugin) Commands() []plugin.Command {
 			{ID: "back", Name: "Back", Description: "Return to board", Context: pluginID, Priority: 1},
 			{ID: "scroll", Name: "Scroll", Description: "Scroll detail", Context: pluginID, Priority: 2},
 			{ID: "status", Name: "Status", Description: "Change status", Context: pluginID, Priority: 3},
+			{ID: "note", Name: "Note", Description: "Add note", Context: pluginID, Priority: 4},
+		}
+	case viewNotesModal:
+		return []plugin.Command{
+			{ID: "save", Name: "Save", Description: "Save note (ctrl+s)", Context: pluginID, Priority: 1},
+			{ID: "cancel", Name: "Cancel", Description: "Close modal", Context: pluginID, Priority: 2},
 		}
 	case viewStatusModal:
 		return []plugin.Command{
@@ -389,6 +464,9 @@ func (p *Plugin) ConsumesTextInput() bool {
 	}
 	if p.view == viewStatusModal && p.statusMdl != nil {
 		return p.statusMdl.consumesTextInput()
+	}
+	if p.view == viewNotesModal && p.notesMdl != nil {
+		return p.notesMdl.consumesTextInput()
 	}
 	return false
 }
@@ -440,6 +518,11 @@ type taskStatusChangedMsg struct {
 	err       error
 }
 
+type taskNoteAddedMsg struct {
+	taskKey string
+	err     error
+}
+
 // SetupCompleteMsg is sent when the setup wizard completes.
 type SetupCompleteMsg struct {
 	Database string
@@ -466,6 +549,14 @@ func (p *Plugin) fetchTaskDetail(key string) tea.Cmd {
 		handoff, _ := store.LatestHandoff(key)
 		edges, _ := store.TaskEdges(key)
 		return taskDetailMsg{task: task, sessions: sessions, handoff: handoff, edges: edges}
+	}
+}
+
+func (p *Plugin) appendNote(taskKey string, note persephoneData.TaskNote) tea.Cmd {
+	store := p.store
+	return func() tea.Msg {
+		err := store.AppendNote(taskKey, note)
+		return taskNoteAddedMsg{taskKey: taskKey, err: err}
 	}
 }
 

@@ -68,7 +68,7 @@ func (d *detailModel) view(width, height int) string {
 	lines = append(lines, "")
 
 	// Metadata
-	statusHint := lipgloss.NewStyle().Foreground(styles.TextMuted).Render("  [s]")
+	statusHint := lipgloss.NewStyle().Foreground(styles.TextMuted).Render("  [s] [n]")
 	lines = append(lines, labelStyle.Render("Status:")+" "+renderStatusBadge(t.Status)+statusHint)
 	if t.Priority != "" {
 		lines = append(lines, labelStyle.Render("Priority:")+" "+valueStyle.Render(t.Priority))
@@ -163,6 +163,29 @@ func (d *detailModel) view(width, height int) string {
 		}
 	}
 
+	// Notes
+	noteHint := lipgloss.NewStyle().Foreground(styles.TextMuted).Render("  [n]")
+	if len(t.Notes) > 0 {
+		lines = append(lines, sectionStyle.Render(fmt.Sprintf("Notes (%d)", len(t.Notes)))+noteHint)
+		noteTimeStyle := lipgloss.NewStyle().Foreground(styles.TextMuted)
+		// Content area: width minus padding (2 sides * 1 char) and indent (2 chars)
+		wrapWidth := width - 6
+		if wrapWidth < 20 {
+			wrapWidth = 20
+		}
+		for _, n := range t.Notes {
+			ts := n.CreatedAt.Format("2006-01-02 15:04")
+			lines = append(lines, noteTimeStyle.Render(fmt.Sprintf("  %s · %s", ts, n.Author)))
+			wrapped := wrapNoteContent(n.Content, wrapWidth)
+			for _, wl := range strings.Split(wrapped, "\n") {
+				lines = append(lines, "  "+valueStyle.Render(wl))
+			}
+			lines = append(lines, "")
+		}
+	} else {
+		lines = append(lines, sectionStyle.Render("Notes")+noteHint)
+	}
+
 	// Join all lines
 	content := strings.Join(lines, "\n")
 
@@ -212,4 +235,38 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// wrapNoteContent performs greedy word-wrap, preserving explicit newlines.
+func wrapNoteContent(content string, maxWidth int) string {
+	if maxWidth < 1 {
+		maxWidth = 1
+	}
+	var out strings.Builder
+	for i, paragraph := range strings.Split(content, "\n") {
+		if i > 0 {
+			out.WriteByte('\n')
+		}
+		words := strings.Fields(paragraph)
+		if len(words) == 0 {
+			continue
+		}
+		lineLen := 0
+		for j, w := range words {
+			wLen := len(w)
+			if j == 0 {
+				out.WriteString(w)
+				lineLen = wLen
+			} else if lineLen+1+wLen > maxWidth {
+				out.WriteByte('\n')
+				out.WriteString(w)
+				lineLen = wLen
+			} else {
+				out.WriteByte(' ')
+				out.WriteString(w)
+				lineLen += 1 + wLen
+			}
+		}
+	}
+	return out.String()
 }
