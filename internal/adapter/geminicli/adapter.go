@@ -41,7 +41,10 @@ type sessionMetaCacheEntry struct {
 
 // New creates a new Gemini CLI adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	return &Adapter{
 		tmpDir:       filepath.Join(home, ".gemini", "tmp"),
 		sessionIndex: make(map[string]string),
@@ -200,9 +203,11 @@ func (a *Adapter) Messages(sessionID string) ([]adapter.Message, error) {
 		}
 
 		// Parse tokens
+		// Note: msg.Tokens.Input already includes cached tokens per Gemini's
+		// token accounting model. CacheRead tracks cache hits separately.
 		if msg.Tokens != nil {
 			m.TokenUsage = adapter.TokenUsage{
-				InputTokens:  msg.Tokens.Input + msg.Tokens.Cached,
+				InputTokens:  msg.Tokens.Input,
 				OutputTokens: msg.Tokens.Output,
 				CacheRead:    msg.Tokens.Cached,
 			}
@@ -499,15 +504,23 @@ func shortID(id string) string {
 	return id
 }
 
-// truncateTitle truncates text to maxLen, adding "..." if truncated.
+// truncateTitle truncates text to maxLen runes, adding "..." if truncated.
 // It also replaces newlines with spaces for display.
+// Uses rune-based length to avoid splitting multibyte UTF-8 characters.
 func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }

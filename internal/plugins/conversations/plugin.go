@@ -173,10 +173,10 @@ type Plugin struct {
 	searchResults []adapter.Session
 
 	// Filter state
-	filterMode             bool
-	filters                SearchFilters
-	filterActive           bool     // true when any filter is active
-	defaultCategoryFilter  []string // from config, used by C toggle to restore
+	filterMode            bool
+	filters               SearchFilters
+	filterActive          bool     // true when any filter is active
+	defaultCategoryFilter []string // from config, used by C toggle to restore
 
 	// Markdown rendering
 	contentRenderer *GlamourRenderer
@@ -1035,6 +1035,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 					MaxResults:    50,
 				},
 				epoch,
+				p.contentSearchState.DebounceVersion,
 			)
 		}
 		return p, nil
@@ -1044,6 +1045,10 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			return p, nil // Ignore stale message from previous project
 		}
 		if p.contentSearchState != nil {
+			// Discard stale results from older debounce versions (option changes)
+			if msg.Version != p.contentSearchState.DebounceVersion {
+				return p, nil
+			}
 			// Only accept results if query matches current query (td-5b9928: prevent stale results)
 			if msg.Query != p.contentSearchState.Query {
 				return p, nil // Discard stale results

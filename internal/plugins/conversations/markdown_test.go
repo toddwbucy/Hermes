@@ -3,6 +3,7 @@ package conversations
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -174,20 +175,24 @@ func TestGlamourRenderer_Concurrent(t *testing.T) {
 	}
 
 	// Run multiple goroutines concurrently
+	var failures atomic.Int32
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			content := contents[idx%len(contents)]
-			width := 60 + (idx % 3) * 20 // 60, 80, or 100
+			width := 60 + (idx%3)*20 // 60, 80, or 100
 			lines := r.RenderContent(content, width)
 			if len(lines) == 0 {
-				t.Errorf("Concurrent render %d returned empty", idx)
+				failures.Add(1)
 			}
 		}(i)
 	}
 
 	wg.Wait()
+	if n := failures.Load(); n > 0 {
+		t.Errorf("%d concurrent renders returned empty", n)
+	}
 }
 
 func TestPlugin_RenderContentFallback(t *testing.T) {

@@ -280,7 +280,8 @@ func (p *Plugin) updateSearch(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 
 	case "backspace":
 		if len(p.searchQuery) > 0 {
-			p.searchQuery = p.searchQuery[:len(p.searchQuery)-1]
+			runes := []rune(p.searchQuery)
+			p.searchQuery = string(runes[:len(runes)-1])
 			p.filterSessions()
 			p.cursor = 0
 			p.scrollOff = 0

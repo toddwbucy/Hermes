@@ -57,7 +57,10 @@ type Adapter struct {
 
 // New creates a new Cursor CLI adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	return &Adapter{
 		chatsDir:     filepath.Join(home, ".cursor", "chats"),
 		sessionCache: make(map[string]sessionCacheEntry),
@@ -376,9 +379,9 @@ func (a *Adapter) parseMessages(dbPath string) ([]adapter.Message, error) {
 		return nil, fmt.Errorf("iterating blobs: %w", err)
 	}
 
-	// Traverse from root blob to collect messages
+	// Traverse from root blob to collect messages (depth-limited to prevent stack overflow)
 	var messages []adapter.Message
-	a.collectMessages(blobs, meta.LatestRootBlobID, &messages)
+	a.collectMessages(blobs, meta.LatestRootBlobID, &messages, 0)
 
 	// Interpolate timestamps: use createdAt for first, file mtime for last
 	if len(messages) > 0 {
@@ -405,8 +408,15 @@ func (a *Adapter) parseMessages(dbPath string) ([]adapter.Message, error) {
 	return messages, nil
 }
 
+// maxBlobDepth limits recursion depth in blob traversal to prevent stack overflow
+// from malformed or cyclic blob references.
+const maxBlobDepth = 100
+
 // collectMessages recursively collects messages from a blob tree.
-func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messages *[]adapter.Message) {
+func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messages *[]adapter.Message, depth int) {
+	if depth > maxBlobDepth {
+		return
+	}
 	data, ok := blobs[blobID]
 	if !ok || len(data) == 0 {
 		return
@@ -437,7 +447,7 @@ func (a *Adapter) collectMessages(blobs map[string][]byte, blobID string, messag
 			break
 		}
 		childID := hex.EncodeToString(data[offset+2 : offset+34])
-		a.collectMessages(blobs, childID, messages)
+		a.collectMessages(blobs, childID, messages, depth+1)
 		offset += 34
 	}
 
@@ -637,8 +647,9 @@ func extractToolResultContent(result json.RawMessage) string {
 
 	// Fallback: return raw JSON (truncated if too long)
 	raw := string(result)
-	if len(raw) > 500 {
-		return raw[:497] + "..."
+	runes := []rune(raw)
+	if len(runes) > 500 {
+		return string(runes[:497]) + "..."
 	}
 	return raw
 }
@@ -651,17 +662,25 @@ func shortID(id string) string {
 	return id
 }
 
-// truncateTitle truncates text to maxLen, adding "..." if truncated.
+// truncateTitle truncates text to maxLen runes, adding "..." if truncated.
 // It also replaces newlines with spaces for display.
+// Uses rune-based length to avoid splitting multibyte UTF-8 characters.
 func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // extractUserQuery extracts the user's query from XML-tagged content.

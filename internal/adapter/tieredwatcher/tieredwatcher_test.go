@@ -612,11 +612,13 @@ func TestBatchReadDirPollDetectsChanges(t *testing.T) {
 	}
 
 	// Modify session-b after registration
-	time.Sleep(10 * time.Millisecond) // ensure mod time differs
 	bPath := filepath.Join(sessionDir, "session-b.jsonl")
 	if err := os.WriteFile(bPath, []byte("{\"updated\":true}"), 0644); err != nil {
 		t.Fatalf("WriteFile error: %v", err)
 	}
+	// Force mtime change on coarse filesystems (e.g., 1s resolution)
+	newTime := time.Now().Add(2 * time.Second)
+	_ = os.Chtimes(bPath, newTime, newTime)
 
 	tw.pollColdSessions()
 

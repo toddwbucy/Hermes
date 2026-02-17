@@ -57,6 +57,8 @@ func injectHighlightsIntoANSI(s string, matches []matchRange, currentMatchIdx in
 	visiblePos := 0 // byte offset in stripped/visible text
 	matchIdx := 0   // index into matches slice
 	inHighlight := false
+	lastStyle := ""         // last ANSI SGR sequence seen in the source
+	preHighlightStyle := "" // style active when highlight started
 
 	i := 0
 	for i < len(s) {
@@ -69,7 +71,16 @@ func injectHighlightsIntoANSI(s string, matches []matchRange, currentMatchIdx in
 			if j < len(s) {
 				j++ // include terminator
 			}
-			result.WriteString(s[i:j])
+			seq := s[i:j]
+			result.WriteString(seq)
+			// Track the last SGR sequence (ends with 'm') so we can restore it after highlights
+			if len(seq) > 0 && seq[len(seq)-1] == 'm' {
+				if seq == "\x1b[0m" || seq == "\x1b[m" {
+					lastStyle = ""
+				} else {
+					lastStyle = seq
+				}
+			}
 			i = j
 			continue
 		}
@@ -77,12 +88,16 @@ func injectHighlightsIntoANSI(s string, matches []matchRange, currentMatchIdx in
 		// Check: end current highlight before starting a new one
 		if inHighlight && matchIdx < len(matches) && visiblePos >= matches[matchIdx].end {
 			result.WriteString("\x1b[0m")
+			if preHighlightStyle != "" {
+				result.WriteString(preHighlightStyle)
+			}
 			inHighlight = false
 			matchIdx++
 		}
 
 		// Check: start highlight
 		if !inHighlight && matchIdx < len(matches) && visiblePos == matches[matchIdx].start {
+			preHighlightStyle = lastStyle
 			inHighlight = true
 			if matches[matchIdx].matchIdx == currentMatchIdx {
 				result.WriteString(extractANSIPrefix(searchMatchCurrentStyle))
@@ -99,6 +114,9 @@ func injectHighlightsIntoANSI(s string, matches []matchRange, currentMatchIdx in
 	// Close unclosed highlight
 	if inHighlight {
 		result.WriteString("\x1b[0m")
+		if preHighlightStyle != "" {
+			result.WriteString(preHighlightStyle)
+		}
 	}
 
 	return result.String()

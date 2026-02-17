@@ -181,6 +181,9 @@ func TestSearchMessages_CaseSensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one result for case-insensitive search")
+	}
 	if len(results[0].Matches) != 3 {
 		t.Errorf("expected 3 case-insensitive matches, got %d", len(results[0].Matches))
 	}
@@ -190,6 +193,9 @@ func TestSearchMessages_CaseSensitive(t *testing.T) {
 	results, err = a.SearchMessages("case-session", "hello", opts)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one result for case-sensitive search")
 	}
 	if len(results[0].Matches) != 1 {
 		t.Errorf("expected 1 case-sensitive match, got %d", len(results[0].Matches))

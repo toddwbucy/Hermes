@@ -155,17 +155,20 @@ func (r *Registry) Reinit(newWorkDir, newProjectRoot string) []tea.Cmd {
 	r.ctx.Epoch++
 
 	// Reinitialize all plugins with the new context
+	ready := make([]Plugin, 0, len(r.plugins))
 	for _, p := range r.plugins {
 		if err := r.safeInit(p); err != nil {
 			if r.ctx != nil && r.ctx.Logger != nil {
 				r.ctx.Logger.Error("plugin reinit failed", "id", p.ID(), "error", err)
 			}
+			continue
 		}
+		ready = append(ready, p)
 	}
 
-	// Collect start commands
-	cmds := make([]tea.Cmd, 0, len(r.plugins))
-	for _, p := range r.plugins {
+	// Collect start commands only for successfully reinitialized plugins
+	cmds := make([]tea.Cmd, 0, len(ready))
+	for _, p := range ready {
 		if cmd := r.safeStart(p); cmd != nil {
 			cmds = append(cmds, cmd)
 		}

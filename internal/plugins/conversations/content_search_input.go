@@ -187,9 +187,12 @@ func (p *Plugin) triggerContentSearch() tea.Cmd {
 	// Require minimum query length (td-5dcadc)
 	queryRunes := []rune(p.contentSearchState.Query)
 	if len(queryRunes) < minQueryLength {
-		// Clear results when query is too short
+		// Clear results and stale UI state when query is too short
 		p.contentSearchState.Results = nil
 		p.contentSearchState.IsSearching = false
+		p.contentSearchState.Error = ""
+		p.contentSearchState.TotalFound = 0
+		p.contentSearchState.Truncated = false
 		p.contentSearchState.Cursor = 0
 		p.contentSearchState.ScrollOffset = 0
 		p.contentSearchState.Skeleton.Stop() // Stop skeleton animation (td-e740e4)

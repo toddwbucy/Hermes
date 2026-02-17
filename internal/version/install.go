@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// InstallMethod represents how sidecar was installed.
+// InstallMethod represents how hermes was installed.
 type InstallMethod string
 
 const (
@@ -23,7 +23,7 @@ var (
 	detectedMethodOnce sync.Once
 )
 
-// DetectInstallMethod determines how sidecar was installed.
+// DetectInstallMethod determines how hermes was installed.
 // Checks Homebrew first, then Go bin directories, falls back to binary.
 // Result is cached for the lifetime of the process.
 func DetectInstallMethod() InstallMethod {
@@ -47,7 +47,7 @@ func detectInstallMethod() InstallMethod {
 	return InstallMethodBinary
 }
 
-// isHomebrewInstall checks if sidecar was installed via Homebrew.
+// isHomebrewInstall checks if hermes was installed via Homebrew.
 func isHomebrewInstall() bool {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		return false

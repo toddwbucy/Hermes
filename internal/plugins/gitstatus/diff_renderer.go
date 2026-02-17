@@ -71,6 +71,9 @@ func RenderLineDiff(diff *ParsedDiff, width, startLine, maxLines, horizontalOffs
 		Align(lipgloss.Right)
 
 	contentWidth := width - (lineNoWidth*2 + 4) // Two line numbers + separators
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
 	isFirstHunk := true
 
 	for _, hunk := range diff.Hunks {
@@ -190,8 +193,14 @@ func RenderSideBySide(diff *ParsedDiff, width, startLine, maxLines, horizontalOf
 
 	// Calculate panel widths
 	panelWidth := (width - 3) / 2 // -3 for center separator
+	if panelWidth < 7 {
+		panelWidth = 7
+	}
 	lineNoWidth := 5
 	contentWidth := panelWidth - lineNoWidth - 2
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
 
 	lineNoStyle := lipgloss.NewStyle().
 		Foreground(styles.TextMuted).

@@ -651,8 +651,9 @@ func (a *Adapter) projectDirPath(projectRoot string) string {
 // related to the given main worktree path. This finds conversations from deleted
 // worktrees that git no longer knows about.
 //
-// Returns decoded absolute paths (e.g., "/Users/foo/code/myrepo-feature") for
+// Returns encoded directory names (e.g., "-Users-foo-code-myrepo-feature") for
 // directories whose encoded name shares the same repository base name.
+// Decoding is lossy (encoding maps /, ., and _ to -) so raw names are returned.
 func (a *Adapter) DiscoverRelatedProjectDirs(mainWorktreePath string) ([]string, error) {
 	absMain, err := filepath.Abs(mainWorktreePath)
 	if err != nil {
@@ -693,9 +694,9 @@ func (a *Adapter) DiscoverRelatedProjectDirs(mainWorktreePath string) ([]string,
 		// 1. Exactly match the main repo encoded path
 		// 2. Start with the main repo encoded path followed by hyphen (worktree suffix)
 		if name == encodedMain || strings.HasPrefix(name, encodedMain+"-") {
-			// Decode: -Users-foo-code-myrepo -> /Users/foo/code/myrepo
-			decoded := strings.ReplaceAll(name, "-", "/")
-			related = append(related, decoded)
+			// Return encoded directory name (decoding is lossy because
+			// encoding replaces /, ., and _ with -, so the reverse is ambiguous)
+			related = append(related, name)
 		}
 	}
 
@@ -1148,10 +1149,17 @@ func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // collectToolResults extracts tool_result content from user messages.

@@ -740,7 +740,14 @@ func uriToPath(uri string) string {
 	if err != nil {
 		return ""
 	}
-	return filepath.FromSlash(parsed.Path)
+	path := parsed.Path
+	// On Windows, file:///C:/Users/foo parses to Path="/C:/Users/foo".
+	// Strip the leading slash before the drive letter to produce a valid path.
+	if runtime.GOOS == "windows" && len(path) >= 3 && path[0] == '/' &&
+		((path[1] >= 'A' && path[1] <= 'Z') || (path[1] >= 'a' && path[1] <= 'z')) && path[2] == ':' {
+		path = path[1:]
+	}
+	return filepath.FromSlash(path)
 }
 
 // pathMatchesProject checks if a tree path matches or is under the project root.
@@ -797,8 +804,15 @@ func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }

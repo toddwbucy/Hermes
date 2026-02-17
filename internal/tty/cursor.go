@@ -84,8 +84,12 @@ func QueryCursorPositionSync(target string) (row, col, paneHeight, paneWidth int
 		return 0, 0, 0, 0, false, false
 	}
 
-	col, _ = strconv.Atoi(parts[0])
-	row, _ = strconv.Atoi(parts[1])
+	var err1, err2 error
+	col, err1 = strconv.Atoi(parts[0])
+	row, err2 = strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0, 0, 0, 0, false, false
+	}
 	visible = len(parts) < 3 || parts[2] != "0"
 	if len(parts) >= 4 {
 		paneHeight, _ = strconv.Atoi(parts[3])

@@ -107,7 +107,7 @@ func ExportSessionToFile(session *adapter.Session, messages []adapter.Message, w
 	if session != nil && session.Name != "" {
 		name = sanitizeFilename(session.Name)
 	} else if session != nil {
-		name = session.ID[:8]
+		name = shortID(session.ID)
 	}
 
 	timestamp := time.Now().Format("20060102-150405")

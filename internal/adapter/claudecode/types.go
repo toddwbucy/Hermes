@@ -58,9 +58,9 @@ type ContentBlock struct {
 
 // ToolResult represents the result of a tool call.
 type ToolResult struct {
-	Type      string `json:"type"`
-	ToolUseID string `json:"tool_use_id"`
-	Content   string `json:"content"`
+	Type      string          `json:"type"`
+	ToolUseID string          `json:"tool_use_id"`
+	Content   json.RawMessage `json:"content"`
 }
 
 // SessionMetadata holds metadata about a session file.

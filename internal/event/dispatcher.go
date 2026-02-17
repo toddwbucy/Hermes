@@ -25,6 +25,9 @@ func New() *Dispatcher {
 
 // NewWithLogger creates a dispatcher with custom logger.
 func NewWithLogger(logger *slog.Logger) *Dispatcher {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &Dispatcher{
 		subscribers: make(map[string][]chan Event),
 		logger:      logger,

@@ -119,8 +119,11 @@ func QueryPaneSize(target string) (width, height int, ok bool) {
 		return 0, 0, false
 	}
 
-	width, _ = strconv.Atoi(parts[0])
-	height, _ = strconv.Atoi(parts[1])
+	width, err1 := strconv.Atoi(parts[0])
+	height, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return 0, 0, false
+	}
 	return width, height, true
 }
 

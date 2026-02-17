@@ -23,17 +23,18 @@ func FuzzyMatch(query, target string) (int, []MatchRange) {
 		return 0, nil
 	}
 
-	queryLower := strings.ToLower(query)
-	targetLower := strings.ToLower(target)
+	queryRunes := []rune(strings.ToLower(query))
+	targetRunes := []rune(strings.ToLower(target))
+	origRunes := []rune(target)
 
-	qi := 0 // query index
+	qi := 0 // query rune index
 	score := 0
 	consecutive := 0
 	var ranges []MatchRange
 	currentRange := MatchRange{Start: -1, End: -1}
 
-	for ti := 0; ti < len(targetLower) && qi < len(queryLower); ti++ {
-		if targetLower[ti] == queryLower[qi] {
+	for ti := 0; ti < len(targetRunes) && qi < len(queryRunes); ti++ {
+		if targetRunes[ti] == queryRunes[qi] {
 			// Match found
 			if currentRange.Start == -1 {
 				currentRange.Start = ti
@@ -47,12 +48,12 @@ func FuzzyMatch(query, target string) (int, []MatchRange) {
 			score += 1 + consecutive
 
 			// Word start bonus (after separator or at start)
-			if ti == 0 || isWordSeparator(rune(target[ti-1])) {
+			if ti == 0 || isWordSeparator(origRunes[ti-1]) {
 				score += 10
 			}
 
 			// Capital letter bonus (camelCase boundary)
-			if ti > 0 && unicode.IsUpper(rune(target[ti])) && unicode.IsLower(rune(target[ti-1])) {
+			if ti > 0 && unicode.IsUpper(origRunes[ti]) && unicode.IsLower(origRunes[ti-1]) {
 				score += 5
 			}
 		} else {
@@ -71,12 +72,12 @@ func FuzzyMatch(query, target string) (int, []MatchRange) {
 	}
 
 	// Did we match all query characters?
-	if qi < len(queryLower) {
+	if qi < len(queryRunes) {
 		return 0, nil // Incomplete match
 	}
 
 	// Bonus for shorter strings (prefer concise names)
-	score += 50 / (len(target) + 1)
+	score += 50 / (len(targetRunes) + 1)
 
 	return score, ranges
 }

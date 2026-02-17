@@ -273,8 +273,10 @@ func (a *Adapter) projectDirPath(projectRoot string) string {
 		absPath = projectRoot
 	}
 	// /home/user/project → --home-user-project--
-	// Strip leading slash, replace remaining slashes with dashes, wrap in --
-	path := strings.TrimPrefix(absPath, "/")
+	// Normalize to forward slashes for consistent encoding across platforms.
+	// On Windows, filepath.Abs returns backslashes (e.g., C:\Users\project).
+	path := filepath.ToSlash(absPath)
+	path = strings.TrimPrefix(path, "/")
 	encoded := strings.ReplaceAll(path, "/", "-")
 	return filepath.Join(a.sessionsDir, "--"+encoded+"--")
 }
@@ -936,10 +938,17 @@ func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // extractSessionMetadata parses the first user message to determine category,

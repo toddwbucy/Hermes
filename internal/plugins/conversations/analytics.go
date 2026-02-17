@@ -11,6 +11,16 @@ import (
 	"github.com/toddwbucy/hermes/internal/styles"
 )
 
+// separatorWidth returns the width to use for separator lines, clamped to avoid
+// negative values that would cause strings.Repeat to panic.
+func (p *Plugin) separatorWidth() int {
+	w := p.width - 2
+	if w < 0 {
+		w = 0
+	}
+	return w
+}
+
 // renderAnalytics renders the global analytics view with scrolling support.
 func (p *Plugin) renderAnalytics() string {
 	// Build all content lines first
@@ -20,7 +30,7 @@ func (p *Plugin) renderAnalytics() string {
 	stats, err := claudecode.LoadStatsCache()
 	if err != nil {
 		lines = append(lines, styles.Title.Render(" Usage Analytics"))
-		lines = append(lines, styles.Muted.Render(strings.Repeat("━", p.width-2)))
+		lines = append(lines, styles.Muted.Render(strings.Repeat("━", p.separatorWidth())))
 		lines = append(lines, styles.StatusDeleted.Render(" Unable to load stats: "+err.Error()))
 		p.analyticsLines = lines
 		return strings.Join(lines, "\n")
@@ -28,7 +38,7 @@ func (p *Plugin) renderAnalytics() string {
 
 	// Header
 	lines = append(lines, styles.Title.Render(" Usage Analytics"))
-	lines = append(lines, styles.Muted.Render(strings.Repeat("━", p.width-2)))
+	lines = append(lines, styles.Muted.Render(strings.Repeat("━", p.separatorWidth())))
 
 	// Summary line
 	firstDate := stats.FirstSessionDate.Format("Jan 2")
@@ -41,7 +51,7 @@ func (p *Plugin) renderAnalytics() string {
 
 	// Weekly activity chart
 	lines = append(lines, styles.Title.Render(" This Week's Activity"))
-	lines = append(lines, styles.Muted.Render(strings.Repeat("─", p.width-2)))
+	lines = append(lines, styles.Muted.Render(strings.Repeat("─", p.separatorWidth())))
 
 	recentActivity := stats.GetRecentActivity(7)
 	maxMsgs := 0
@@ -63,7 +73,7 @@ func (p *Plugin) renderAnalytics() string {
 
 	// Model usage
 	lines = append(lines, styles.Title.Render(" Model Usage"))
-	lines = append(lines, styles.Muted.Render(strings.Repeat("─", p.width-2)))
+	lines = append(lines, styles.Muted.Render(strings.Repeat("─", p.separatorWidth())))
 
 	// Sort models by total tokens descending for stable ordering
 	type modelEntry struct {

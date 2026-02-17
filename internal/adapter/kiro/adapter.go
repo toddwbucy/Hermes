@@ -33,7 +33,10 @@ type Adapter struct {
 
 // New creates a new Kiro adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	dbPath := findKiroDB(home)
 	return &Adapter{
 		dbPath: dbPath,
@@ -574,16 +577,24 @@ func shortConversationID(id string) string {
 	return id
 }
 
-// truncateText truncates text to maxLen, adding "..." if truncated.
+// truncateText truncates text to maxLen runes, adding "..." if truncated.
+// Uses rune-based length to avoid splitting multibyte UTF-8 characters.
 func truncateText(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // truncateOutput truncates command output to maxLen characters.

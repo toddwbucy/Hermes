@@ -98,11 +98,10 @@ func LoadFrom(path string) (*Config, error) {
 	cfg := Default()
 
 	if path == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
+		path = ConfigPath()
+		if path == "" {
 			return cfg, nil // Return defaults on error
 		}
-		path = filepath.Join(home, configDir, configFile)
 	}
 
 	data, err := os.ReadFile(path)

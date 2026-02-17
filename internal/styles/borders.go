@@ -25,7 +25,10 @@ func colorChar(char string, color RGB) string {
 // The gradient flows at the specified angle (typically 30 degrees).
 // width and height are the outer dimensions including borders.
 func RenderGradientBorder(content string, width, height int, gradient Gradient, padding int) string {
-	if width < 3 || height < 3 {
+	if padding < 0 {
+		padding = 0
+	}
+	if width < (2+padding*2) || height < 3 {
 		return content
 	}
 

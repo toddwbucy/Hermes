@@ -11,7 +11,10 @@ import (
 func TestIntegrationWithRealData(t *testing.T) {
 	a := New()
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skip("cannot determine home directory")
+	}
 	projects := []string{
 		filepath.Join(home, "code", "sidecar"),
 		filepath.Join(home, "code", "td"),
