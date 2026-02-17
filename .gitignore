@@ -1,0 +1,24 @@
+# Binaries
+bin/
+hermes
+*.exe
+
+# Build artifacts
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+debug.log
+*.prof
+
+# Hermes workspace config
+.hermes/
