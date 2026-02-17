@@ -77,6 +77,9 @@ func LoadStatsCache() (*StatsCache, error) {
 
 // GetRecentActivity returns daily activity for the last n days.
 func (s *StatsCache) GetRecentActivity(days int) []DailyActivity {
+	if days <= 0 {
+		return nil
+	}
 	if len(s.DailyActivity) <= days {
 		return s.DailyActivity
 	}
