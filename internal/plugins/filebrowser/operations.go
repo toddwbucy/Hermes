@@ -99,6 +99,8 @@ func (p *Plugin) revealInFileManager(path string) tea.Cmd {
 		if err := cmd.Start(); err != nil {
 			return RevealErrorMsg{Err: err}
 		}
+		// Release the process handle since we don't need the exit status
+		_ = cmd.Process.Release()
 		return nil
 	}
 }
@@ -115,10 +117,18 @@ func (p *Plugin) validateDestPath(dstPath string) error {
 		return fmt.Errorf("invalid destination path")
 	}
 
-	absWorkDir, err := filepath.Abs(p.ctx.WorkDir)
+	// Resolve symlinks in workdir to prevent symlink escape attacks
+	absWorkDir, err := filepath.EvalSymlinks(p.ctx.WorkDir)
 	if err != nil {
 		return fmt.Errorf("failed to resolve work directory")
 	}
+
+	// Resolve symlinks in destination parent (dst itself may not exist yet)
+	dstParent, err := filepath.EvalSymlinks(filepath.Dir(absDst))
+	if err != nil {
+		return fmt.Errorf("invalid destination path")
+	}
+	absDst = filepath.Join(dstParent, filepath.Base(absDst))
 
 	// Check if destination is within workdir
 	relPath, err := filepath.Rel(absWorkDir, absDst)
@@ -244,7 +254,16 @@ func (p *Plugin) doFileOp(src, dst string) tea.Cmd {
 
 		if isCaseOnlyRename {
 			// Two-step rename: src -> temp -> dst
-			tempPath := src + ".hermes-rename-tmp"
+			// Use a unique temp name to avoid collisions with existing files
+			dir := filepath.Dir(src)
+			tmpFile, err := os.CreateTemp(dir, ".hermes-rename-*")
+			if err != nil {
+				return FileOpErrorMsg{Err: fmt.Errorf("rename failed: %w", err)}
+			}
+			tempPath := tmpFile.Name()
+			_ = tmpFile.Close()
+			_ = os.Remove(tempPath) // Remove the temp file so we can rename onto it
+
 			if err := os.Rename(src, tempPath); err != nil {
 				return FileOpErrorMsg{Err: fmt.Errorf("rename failed: %w", err)}
 			}

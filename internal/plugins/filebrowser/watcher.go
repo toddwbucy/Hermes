@@ -143,8 +143,19 @@ func (w *Watcher) Events() <-chan struct{} {
 	return w.events
 }
 
-// Stop shuts down the watcher.
+// Stop shuts down the watcher. It is safe to call multiple times.
 func (w *Watcher) Stop() {
+	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		return
+	}
+	w.closed = true
+	if w.debounce != nil {
+		w.debounce.Stop()
+		w.debounce = nil
+	}
 	close(w.stop)
+	w.mu.Unlock()
 	_ = w.fsWatcher.Close()
 }

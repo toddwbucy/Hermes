@@ -121,6 +121,10 @@ func GetNewFileDiff(workDir, path string) (string, error) {
 	}
 
 	lines := strings.Split(string(content), "\n")
+	// Drop trailing empty element from strings.Split on content with trailing newline
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
 	lineCount := len(lines)
 
 	var sb strings.Builder
