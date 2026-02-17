@@ -398,6 +398,25 @@ func DefaultBindings() []Binding {
 		// Workspace interactive context bindings are registered dynamically
 		// by the workspace plugin Init() to reflect configured keys.
 
+		// Persephone task board context
+		{Key: "j", Command: "nav", Context: "persephone"},
+		{Key: "k", Command: "nav", Context: "persephone"},
+		{Key: "h", Command: "nav", Context: "persephone"},
+		{Key: "l", Command: "nav", Context: "persephone"},
+		{Key: "down", Command: "nav", Context: "persephone"},
+		{Key: "up", Command: "nav", Context: "persephone"},
+		{Key: "left", Command: "nav", Context: "persephone"},
+		{Key: "right", Command: "nav", Context: "persephone"},
+		{Key: "enter", Command: "open", Context: "persephone"},
+		{Key: "r", Command: "refresh", Context: "persephone"},
+		{Key: "esc", Command: "back", Context: "persephone"},
+		{Key: "q", Command: "back", Context: "persephone"},
+		{Key: "s", Command: "status", Context: "persephone"},
+		{Key: "n", Command: "note", Context: "persephone"},
+		{Key: "ctrl+s", Command: "save", Context: "persephone"},
+		{Key: "tab", Command: "select", Context: "persephone"},
+		{Key: "esc", Command: "cancel", Context: "persephone"},
+
 		// Notes list context
 		{Key: "j", Command: "cursor-down", Context: "notes-list"},
 		{Key: "k", Command: "cursor-up", Context: "notes-list"},

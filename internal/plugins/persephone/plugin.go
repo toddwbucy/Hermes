@@ -437,7 +437,7 @@ func (p *Plugin) Commands() []plugin.Command {
 	case viewDetail:
 		return []plugin.Command{
 			{ID: "back", Name: "Back", Description: "Return to board", Context: pluginID, Priority: 1},
-			{ID: "scroll", Name: "Scroll", Description: "Scroll detail", Context: pluginID, Priority: 2},
+			{ID: "nav", Name: "Scroll", Description: "Scroll detail", Context: pluginID, Priority: 2},
 			{ID: "status", Name: "Status", Description: "Change status", Context: pluginID, Priority: 3},
 			{ID: "note", Name: "Note", Description: "Add note", Context: pluginID, Priority: 4},
 		}
