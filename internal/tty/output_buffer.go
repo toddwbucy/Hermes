@@ -61,8 +61,9 @@ func (b *OutputBuffer) Update(content string) bool {
 
 	// Check hash BEFORE expensive regex processing
 	// Compute hash of raw content first
+	rawLen := len(content)
 	rawHash := maphash.String(b.hashSeed, content)
-	if rawHash == b.lastRawHash && len(content) == b.lastLen {
+	if rawHash == b.lastRawHash && rawLen == b.lastLen {
 		return false // Content unchanged - skip ALL processing
 	}
 
@@ -83,7 +84,7 @@ func (b *OutputBuffer) Update(content string) bool {
 	cleanHash := maphash.String(b.hashSeed, content)
 	b.lastHash = cleanHash
 	b.lastRawHash = rawHash
-	b.lastLen = len(content)
+	b.lastLen = rawLen
 	// Trim trailing newline before split to avoid spurious empty element.
 	// tmux capture-pane output ends with \n, which would create an extra empty
 	// element after split, causing cursor alignment to be off by one line.

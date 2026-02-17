@@ -32,7 +32,11 @@ func cachePath() string {
 
 // LoadCache reads cached version check result from disk.
 func LoadCache() (*CacheEntry, error) {
-	data, err := os.ReadFile(cachePath())
+	path := cachePath()
+	if path == "" {
+		return nil, os.ErrNotExist
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +96,11 @@ func tdCachePath() string {
 
 // LoadTdCache reads cached td version check result from disk.
 func LoadTdCache() (*CacheEntry, error) {
-	data, err := os.ReadFile(tdCachePath())
+	path := tdCachePath()
+	if path == "" {
+		return nil, os.ErrNotExist
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
