@@ -423,10 +423,6 @@ func (p *Plugin) SetFocused(f bool) { p.focused = f }
 
 // Commands returns the plugin's available commands.
 func (p *Plugin) Commands() []plugin.Command {
-	if !p.focused {
-		return nil
-	}
-
 	switch p.view {
 	case viewBoard:
 		return []plugin.Command{
