@@ -109,11 +109,12 @@ func (s *listSection) Render(contentWidth int, focusID, hoverID string) Rendered
 
 		item := s.items[itemIdx]
 		isSelected := s.selectedIdx != nil && *s.selectedIdx == itemIdx
+		isFocusedItem := !s.singleFocus && item.ID == focusID
 		isHovered := item.ID == hoverID
 
 		// Determine style
 		var style lipgloss.Style
-		if isSelected {
+		if isSelected || isFocusedItem {
 			style = styles.ListItemFocused
 		} else if isHovered {
 			style = styles.ListItemSelected
@@ -121,11 +122,11 @@ func (s *listSection) Render(contentWidth int, focusID, hoverID string) Rendered
 			style = styles.ListItemNormal
 		}
 
-		// Render cursor - show when selected, or when list has focus and this is selected item
+		// Render cursor - show when selected/focused
 		cursor := "  "
-		if isSelected {
-			if listHasFocus {
-				cursor = styles.ListCursor.Render("▸ ") // Filled cursor when list has focus
+		if isSelected || isFocusedItem {
+			if listHasFocus || isFocusedItem {
+				cursor = styles.ListCursor.Render("▸ ") // Filled cursor when focused
 			} else {
 				cursor = styles.ListCursor.Render("> ")
 			}
@@ -188,10 +189,13 @@ func (s *listSection) Update(msg tea.Msg, focusID string) (string, tea.Cmd) {
 		// In singleFocus mode, ONLY check if list ID matches (don't respond to individual item IDs)
 		isFocused = focusID == s.id
 	} else {
-		// Otherwise, check if any item is focused
-		for _, item := range s.items {
+		// Per-item focus mode: sync selectedIdx from the focused item ID
+		for i, item := range s.items {
 			if item.ID == focusID {
 				isFocused = true
+				if s.selectedIdx != nil {
+					*s.selectedIdx = i
+				}
 				break
 			}
 		}

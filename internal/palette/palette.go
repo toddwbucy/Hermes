@@ -69,7 +69,7 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 	// Reserve space for input, borders, layer headers
 	m.maxVisible = max(5, (height-10)/2)
-	m.textInput.Width = min(50, width-10)
+	m.textInput.Width = max(1, min(50, width-10))
 }
 
 // Open prepares the palette for display.
