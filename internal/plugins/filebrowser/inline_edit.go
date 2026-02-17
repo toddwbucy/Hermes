@@ -80,7 +80,13 @@ func (p *Plugin) enterInlineEditMode(path string, lineNo int) tea.Cmd {
 		// Use -x and -y to set initial size (will be resized later)
 		// Pass TERM environment for proper color/theme support
 		// Include +lineNo for editors that support it (vim, nano, emacs, helix, etc.)
-		editorArgs := []string{editor}
+		// Parse editor into command + args (handles "code -w", "emacs -nw", etc.)
+		editorParts := strings.Fields(editor)
+		if len(editorParts) == 0 {
+			editorParts = []string{"vim"}
+		}
+		editorArgs := make([]string, len(editorParts))
+		copy(editorArgs, editorParts)
 		if lineNo > 0 {
 			// Convert 0-indexed to 1-indexed for editor
 			editorArgs = append(editorArgs, fmt.Sprintf("+%d", lineNo+1))
@@ -503,8 +509,16 @@ func (p *Plugin) handleExitConfirmationChoice() (*Plugin, tea.Cmd) {
 		// If unknown editor, we still proceed but skip the save attempt
 		sendEditorSaveAndQuit(target, editor)
 
-		// Give editor a moment to process, then kill session
-		// (Session may already be dead from quit command, kill-session will fail silently)
+		// Wait for editor to process save-and-quit before killing the session.
+		// The tmux send-keys returns immediately, so we poll until the session
+		// exits gracefully (editor wrote file and quit) or timeout is reached.
+		for i := 0; i < 10; i++ {
+			time.Sleep(50 * time.Millisecond)
+			if !isSessionAlive(target) {
+				break
+			}
+		}
+
 		p.exitInlineEditMode()
 		return p.processPendingClickAction()
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -268,7 +269,18 @@ func RunProjectSearch(workDir string, state *ProjectSearchState, epoch uint64) t
 			return ProjectSearchResultsMsg{Epoch: epoch, Error: err}
 		}
 
-		results := parseRipgrepOutput(stdout, projectSearchMaxResults, len(state.Query))
+		// For regex searches, compile the pattern so we can determine actual match length.
+		// For fixed-string searches, queryLen is exact.
+		var re *regexp.Regexp
+		if state.UseRegex {
+			flags := ""
+			if !state.CaseSensitive {
+				flags = "(?i)"
+			}
+			re, _ = regexp.Compile(flags + state.Query)
+		}
+
+		results := parseRipgrepOutput(stdout, projectSearchMaxResults, len(state.Query), re)
 
 		// Kill ripgrep early if we hit our limit - don't wait for it to finish
 		// This is critical for queries with many matches (e.g., common words)
@@ -308,7 +320,9 @@ func buildRipgrepArgs(state *ProjectSearchState) []string {
 }
 
 // parseRipgrepOutput reads ripgrep line output (filename:line:col:content) and builds results.
-func parseRipgrepOutput(reader interface{ Read([]byte) (int, error) }, maxMatches int, queryLen int) []SearchFileResult {
+// queryLen is used for fixed-string searches. When re is non-nil (regex mode), it is used
+// to determine the actual match length at the reported column.
+func parseRipgrepOutput(reader interface{ Read([]byte) (int, error) }, maxMatches int, queryLen int, re *regexp.Regexp) []SearchFileResult {
 	scanner := bufio.NewScanner(reader)
 	// Increase buffer size for long lines
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -342,9 +356,15 @@ func parseRipgrepOutput(reader interface{ Read([]byte) (int, error) }, maxMatche
 			fileOrder = append(fileOrder, path)
 		}
 
-		// Calculate match end from query length (column is 1-indexed)
+		// Calculate match end (column is 1-indexed)
 		colStart := colNo - 1
 		colEnd := colStart + queryLen
+		// For regex searches, determine actual match length from the content
+		if re != nil && colStart < len(content) {
+			if loc := re.FindStringIndex(content[colStart:]); loc != nil {
+				colEnd = colStart + loc[1]
+			}
+		}
 
 		file.Matches = append(file.Matches, SearchMatch{
 			LineNo:   lineNo,

@@ -1,6 +1,7 @@
 package gitstatus
 
 import (
+	"errors"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -99,7 +100,7 @@ func GetCommitDetail(workDir, hash string) (*Commit, error) {
 
 	lines := strings.SplitN(string(output), "\n", 8)
 	if len(lines) < 7 {
-		return nil, nil
+		return nil, errors.New("unexpected git show output: too few lines")
 	}
 
 	timestamp, _ := strconv.ParseInt(strings.TrimSpace(lines[4]), 10, 64)

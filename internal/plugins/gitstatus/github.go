@@ -82,6 +82,9 @@ func openInBrowser(url string) tea.Cmd {
 		if err := cmd.Start(); err != nil {
 			return app.ToastMsg{Message: "Failed to open browser: " + err.Error(), Duration: 3 * time.Second, IsError: true}
 		}
+		// Release the process handle since we don't need the exit status.
+		// Without this (or Wait), the process handle leaks.
+		_ = cmd.Process.Release()
 		return nil
 	}
 }
