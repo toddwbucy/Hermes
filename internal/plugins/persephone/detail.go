@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 	persephoneData "github.com/toddwbucy/hermes/internal/persephone"
 	"github.com/toddwbucy/hermes/internal/styles"
 )
@@ -253,7 +254,7 @@ func wrapNoteContent(content string, maxWidth int) string {
 		}
 		lineLen := 0
 		for j, w := range words {
-			wLen := len(w)
+			wLen := runewidth.StringWidth(w)
 			if j == 0 {
 				out.WriteString(w)
 				lineLen = wLen

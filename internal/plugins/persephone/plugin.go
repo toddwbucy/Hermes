@@ -174,6 +174,9 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		return p, p.Start()
 
 	case taskNoteAddedMsg:
+		if plugin.IsStale(p.ctx, msg) {
+			return p, nil
+		}
 		p.view = viewDetail
 		p.notesMdl = nil
 		if msg.err != nil {
@@ -520,8 +523,11 @@ type taskStatusChangedMsg struct {
 
 type taskNoteAddedMsg struct {
 	taskKey string
+	epoch   uint64
 	err     error
 }
+
+func (m taskNoteAddedMsg) GetEpoch() uint64 { return m.epoch }
 
 // SetupCompleteMsg is sent when the setup wizard completes.
 type SetupCompleteMsg struct {
@@ -554,9 +560,10 @@ func (p *Plugin) fetchTaskDetail(key string) tea.Cmd {
 
 func (p *Plugin) appendNote(taskKey string, note persephoneData.TaskNote) tea.Cmd {
 	store := p.store
+	epoch := p.ctx.Epoch
 	return func() tea.Msg {
 		err := store.AppendNote(taskKey, note)
-		return taskNoteAddedMsg{taskKey: taskKey, err: err}
+		return taskNoteAddedMsg{taskKey: taskKey, epoch: epoch, err: err}
 	}
 }
 
