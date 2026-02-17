@@ -177,6 +177,10 @@ func SetEnabled(name string, enabled bool) error {
 		return ErrNotInitialized
 	}
 
+	if globalManager.cfg == nil {
+		return ErrNotInitialized
+	}
+
 	globalManager.mu.Lock()
 	defer globalManager.mu.Unlock()
 

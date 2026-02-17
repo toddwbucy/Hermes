@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,19 +24,25 @@ var (
 	lastCheck         time.Time
 	lastCount         int
 	lastCheckMu       sync.Mutex
+	thresholdsMu      sync.RWMutex
 	warningThreshold  = DefaultWarningThreshold
 	criticalThreshold = DefaultCriticalThreshold
 )
 
 // SetThresholds configures the warning and critical thresholds.
 func SetThresholds(warning, critical int) {
+	thresholdsMu.Lock()
 	warningThreshold = warning
 	criticalThreshold = critical
+	thresholdsMu.Unlock()
 }
 
 // Thresholds returns the current warning and critical thresholds.
 func Thresholds() (warning, critical int) {
-	return warningThreshold, criticalThreshold
+	thresholdsMu.RLock()
+	warning, critical = warningThreshold, criticalThreshold
+	thresholdsMu.RUnlock()
+	return warning, critical
 }
 
 // Count returns the current number of open file descriptors for this process.
@@ -81,15 +88,20 @@ func Check(logger *slog.Logger) (count int, warned bool) {
 	lastCheck = time.Now()
 	lastCount = count
 
-	if count >= criticalThreshold {
+	thresholdsMu.RLock()
+	warnTh := warningThreshold
+	critTh := criticalThreshold
+	thresholdsMu.RUnlock()
+
+	if count >= critTh {
 		if logger != nil {
-			logger.Warn("critical FD count", "count", count, "threshold", criticalThreshold)
+			logger.Warn("critical FD count", "count", count, "threshold", critTh)
 		}
 		return count, true
 	}
-	if count >= warningThreshold {
+	if count >= warnTh {
 		if logger != nil {
-			logger.Warn("high FD count", "count", count, "threshold", warningThreshold)
+			logger.Warn("high FD count", "count", count, "threshold", warnTh)
 		}
 		return count, true
 	}
@@ -139,9 +151,9 @@ func DebugInfo() map[string]int {
 		// Categorize by file type/pattern
 		var category string
 		switch {
-		case target == "pipe" || target == "anon_inode:[pipe]":
+		case target == "pipe" || strings.HasPrefix(target, "pipe:") || target == "anon_inode:[pipe]":
 			category = "pipe"
-		case target == "socket" || len(target) > 0 && target[0] == '[':
+		case target == "socket" || strings.HasPrefix(target, "socket:") || len(target) > 0 && target[0] == '[':
 			category = "socket"
 		case filepath.Ext(target) == ".jsonl":
 			category = "jsonl"

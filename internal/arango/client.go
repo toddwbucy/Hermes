@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 )
@@ -74,11 +75,12 @@ func (c *Client) Query(aql string, bindVars map[string]any) ([]json.RawMessage, 
 		return nil, fmt.Errorf("marshal query: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/_db/%s/_api/cursor", c.baseURL, c.database)
+	db := url.PathEscape(c.database)
+	endpoint := fmt.Sprintf("%s/_db/%s/_api/cursor", c.baseURL, db)
 	var allResults []json.RawMessage
 
 	// First request
-	resp, err := c.doRequest("POST", url, data)
+	resp, err := c.doRequest("POST", endpoint, data)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +97,7 @@ func (c *Client) Query(aql string, bindVars map[string]any) ([]json.RawMessage, 
 
 	// Follow cursor pages
 	for cursor.HasMore && cursor.ID != "" {
-		nextURL := fmt.Sprintf("%s/_db/%s/_api/cursor/%s", c.baseURL, c.database, cursor.ID)
+		nextURL := fmt.Sprintf("%s/_db/%s/_api/cursor/%s", c.baseURL, db, url.PathEscape(cursor.ID))
 		resp, err = c.doRequest("PUT", nextURL, nil)
 		if err != nil {
 			return allResults, fmt.Errorf("cursor follow: %w", err)
@@ -117,8 +119,8 @@ func (c *Client) Query(aql string, bindVars map[string]any) ([]json.RawMessage, 
 
 // Ping tests connectivity to the database.
 func (c *Client) Ping() error {
-	url := fmt.Sprintf("%s/_db/%s/_api/version", c.baseURL, c.database)
-	_, err := c.doRequest("GET", url, nil)
+	endpoint := fmt.Sprintf("%s/_db/%s/_api/version", c.baseURL, url.PathEscape(c.database))
+	_, err := c.doRequest("GET", endpoint, nil)
 	return err
 }
 
@@ -135,8 +137,9 @@ func (c *Client) UpdateDocument(collection, key string, fields map[string]any) e
 		return fmt.Errorf("marshal update: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/_db/%s/_api/document/%s/%s", c.baseURL, c.database, collection, key)
-	_, err = c.doRequest("PATCH", url, data)
+	endpoint := fmt.Sprintf("%s/_db/%s/_api/document/%s/%s",
+		c.baseURL, url.PathEscape(c.database), url.PathEscape(collection), url.PathEscape(key))
+	_, err = c.doRequest("PATCH", endpoint, data)
 	return err
 }
 
