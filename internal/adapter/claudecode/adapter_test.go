@@ -2,12 +2,16 @@ package claudecode
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/toddwbucy/hermes/internal/adapter"
 )
 
 func TestDetect(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	// Get the current working directory for testing
@@ -34,6 +38,9 @@ func TestDetect(t *testing.T) {
 }
 
 func TestSessions(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	cwd, err := os.Getwd()
@@ -71,6 +78,9 @@ func TestSessions(t *testing.T) {
 }
 
 func TestMessages(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	cwd, err := os.Getwd()
@@ -122,6 +132,9 @@ func TestMessages(t *testing.T) {
 }
 
 func TestUsage(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	cwd, err := os.Getwd()
@@ -258,6 +271,9 @@ func TestProjectDirPath_PathWithMixedSpecialChars(t *testing.T) {
 }
 
 func TestDetect_RelativePath(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	// Get current working directory
@@ -283,11 +299,17 @@ func TestDetect_RelativePath(t *testing.T) {
 }
 
 func containsPath(path, substr string) bool {
-	return len(path) > 0 && len(substr) > 0 && path[len(path)-len(substr):] == substr ||
-		(len(path) >= len(substr) && path[len(path)-len(substr)-1:len(path)-1] == substr)
+	if path == "" || substr == "" {
+		return false
+	}
+	trimmed := strings.TrimRight(path, string(os.PathSeparator))
+	return strings.HasSuffix(trimmed, substr)
 }
 
 func TestSessions_RelativePath(t *testing.T) {
+	if os.Getenv("HERMES_INTEGRATION") != "1" {
+		t.Skip("set HERMES_INTEGRATION=1 to run against local Claude Code data")
+	}
 	a := New()
 
 	cwd, err := os.Getwd()
@@ -639,13 +661,11 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 
 	// Create test directories
 	// Claude Code encoding: /Users/test/code/myrepo -> -Users-test-code-myrepo
-	// KNOWN LIMITATION: Decoding is lossy - hyphens in original paths become slashes.
-	// E.g., worktree at /Users/test/code/myrepo-feature encodes to -Users-test-code-myrepo-feature
-	// but decodes to /Users/test/code/myrepo/feature (incorrect, but acceptable for discovery purposes)
+	// Returns encoded directory names (decoding is lossy, so we return raw names)
 	dirs := []string{
 		"-Users-test-code-myrepo",         // main repo
-		"-Users-test-code-myrepo-feature", // worktree (decodes with slash, not hyphen)
-		"-Users-test-code-myrepo-bugfix",  // worktree (decodes with slash, not hyphen)
+		"-Users-test-code-myrepo-feature", // worktree
+		"-Users-test-code-myrepo-bugfix",  // worktree
 		"-Users-test-other",               // unrelated project
 		"-Users-test-code-myrepo2",        // different repo (myrepo2, not myrepo)
 	}
@@ -663,8 +683,8 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 		{
 			name:     "finds related paths",
 			mainPath: "/Users/test/code/myrepo",
-			// Note: decoded paths have slashes where original had hyphens (known limitation)
-			want: []string{"/Users/test/code/myrepo", "/Users/test/code/myrepo/feature", "/Users/test/code/myrepo/bugfix"},
+			// Returns encoded directory names (decoding is lossy)
+			want: []string{"-Users-test-code-myrepo", "-Users-test-code-myrepo-feature", "-Users-test-code-myrepo-bugfix"},
 		},
 		{
 			name:     "empty for invalid main path",
@@ -686,7 +706,7 @@ func TestDiscoverRelatedProjectDirs(t *testing.T) {
 				}
 				// Verify myrepo2 and other are not included
 				for _, p := range got {
-					if p == "/Users/test/other" || p == "/Users/test/code/myrepo2" {
+					if p == "-Users-test-other" || p == "-Users-test-code-myrepo2" {
 						t.Errorf("should not include unrelated path: %s", p)
 					}
 				}

@@ -54,6 +54,7 @@ type TieredWatcher struct {
 	// Output channel
 	events chan adapter.Event
 	closed bool
+	wg     sync.WaitGroup // tracks background goroutines for clean shutdown
 
 	// Configuration
 	rootDir     string                                  // Root directory to watch
@@ -116,9 +117,10 @@ func New(cfg Config) (*TieredWatcher, <-chan adapter.Event, error) {
 	tw.pollDone = make(chan struct{})
 	tw.pollTicker = time.NewTicker(ColdPollInterval)
 
-	go tw.watchLoop()
-	go tw.pollLoop()
-	go tw.demotionLoop()
+	tw.wg.Add(3)
+	go func() { defer tw.wg.Done(); tw.watchLoop() }()
+	go func() { defer tw.wg.Done(); tw.pollLoop() }()
+	go func() { defer tw.wg.Done(); tw.demotionLoop() }()
 
 	return tw, tw.events, nil
 }
@@ -426,9 +428,15 @@ func (tw *TieredWatcher) pollLoop() {
 // pollColdSessions checks non-frozen COLD tier sessions for changes using batch ReadDir.
 func (tw *TieredWatcher) pollColdSessions() {
 	tw.mu.Lock()
+	// Only exclude HOT sessions whose directories are actually being watched.
+	// If watcher.Add failed for a dir, those sessions need COLD polling as fallback.
 	hotSet := make(map[string]bool, len(tw.hotIDs))
 	for _, id := range tw.hotIDs {
-		hotSet[id] = true
+		if info := tw.sessions[id]; info != nil {
+			if tw.watchDirs[filepath.Dir(info.Path)] {
+				hotSet[id] = true
+			}
+		}
 	}
 
 	// Collect non-frozen COLD sessions to check, grouped by directory
@@ -624,6 +632,9 @@ func (tw *TieredWatcher) syncHotDirsLocked() {
 			if err := tw.watcher.Add(dir); err == nil {
 				tw.watchDirs[dir] = true
 			}
+			// If Add fails (e.g., FD limit), dir stays out of watchDirs.
+			// Sessions in unwatched dirs will be picked up by COLD polling
+			// since pollColdSessions only skips sessions whose dirs are watched.
 		}
 	}
 
@@ -660,6 +671,9 @@ func (tw *TieredWatcher) Close() error {
 	if tw.watcher != nil {
 		_ = tw.watcher.Close()
 	}
+
+	// Wait for goroutines to finish before closing events channel
+	tw.wg.Wait()
 
 	// Close events channel
 	close(tw.events)
@@ -719,6 +733,8 @@ type Manager struct {
 	events   chan adapter.Event
 	closers  []io.Closer
 	closed   bool
+	done     chan struct{}
+	wg       sync.WaitGroup
 }
 
 // NewManager creates a new tiered watcher manager.
@@ -726,6 +742,7 @@ func NewManager() *Manager {
 	return &Manager{
 		watchers: make(map[string]*TieredWatcher),
 		events:   make(chan adapter.Event, 64),
+		done:     make(chan struct{}),
 	}
 }
 
@@ -742,15 +759,13 @@ func (m *Manager) AddWatcher(adapterID string, tw *TieredWatcher, ch <-chan adap
 	m.closers = append(m.closers, tw.NewCloser())
 
 	// Forward events from this watcher to the merged channel
+	m.wg.Add(1)
 	go func() {
+		defer m.wg.Done()
 		for evt := range ch {
-			m.mu.Lock()
-			closed := m.closed
-			m.mu.Unlock()
-			if closed {
-				return
-			}
 			select {
+			case <-m.done:
+				return
 			case m.events <- evt:
 			default:
 			}
@@ -842,12 +857,14 @@ func (m *Manager) Close() error {
 		return nil
 	}
 	m.closed = true
+	close(m.done)
 	closers := m.closers
 	m.mu.Unlock()
 
 	for _, c := range closers {
 		_ = c.Close()
 	}
+	m.wg.Wait()
 	close(m.events)
 	return nil
 }

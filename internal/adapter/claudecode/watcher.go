@@ -29,6 +29,7 @@ func NewWatcher(projectDir string) (<-chan adapter.Event, io.Closer, error) {
 		// Debounce timer
 		var debounceTimer *time.Timer
 		var lastEvent fsnotify.Event
+		var debounceSeq uint64
 		debounceDelay := 100 * time.Millisecond
 
 		// Protect against sending to closed channel from timer callback
@@ -59,6 +60,8 @@ func NewWatcher(projectDir string) (<-chan adapter.Event, io.Closer, error) {
 
 				mu.Lock()
 				lastEvent = event
+				debounceSeq++
+				seq := debounceSeq
 
 				// Debounce rapid events
 				if debounceTimer != nil {
@@ -68,7 +71,8 @@ func NewWatcher(projectDir string) (<-chan adapter.Event, io.Closer, error) {
 					mu.Lock()
 					defer mu.Unlock()
 
-					if closed {
+					// Only the latest scheduled callback should emit.
+					if closed || seq != debounceSeq {
 						return
 					}
 

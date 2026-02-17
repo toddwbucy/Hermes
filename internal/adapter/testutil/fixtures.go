@@ -107,11 +107,13 @@ func GenerateClaudeCodeSessionFile(path string, messageCount int, avgMessageSize
 // generateTextContent creates a content block with text of approximately the given size.
 func generateTextContent(size int, role string, index int) json.RawMessage {
 	text := fmt.Sprintf("%s message #%d: ", role, index)
-	padding := make([]byte, size-len(text))
-	for i := range padding {
-		padding[i] = 'x'
+	if size > len(text) {
+		padding := make([]byte, size-len(text))
+		for i := range padding {
+			padding[i] = 'x'
+		}
+		text += string(padding)
 	}
-	text += string(padding)
 
 	blocks := []map[string]any{
 		{"type": "text", "text": text},
