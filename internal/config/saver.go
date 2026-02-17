@@ -96,6 +96,9 @@ func toSaveConfig(cfg *Config) saveConfig {
 // any keys it doesn't manage (e.g. "prompts").
 func Save(cfg *Config) error {
 	path := ConfigPath()
+	if path == "" {
+		return fmt.Errorf("config path unavailable")
+	}
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {

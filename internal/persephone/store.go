@@ -3,6 +3,7 @@ package persephone
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/toddwbucy/hermes/internal/arango"
@@ -174,6 +175,10 @@ func (s *Store) TransitionTask(taskKey, newStatus, blockReason string) error {
 	}
 	if !valid {
 		return fmt.Errorf("invalid transition: %s → %s", task.Status, newStatus)
+	}
+
+	if newStatus == StatusBlocked && strings.TrimSpace(blockReason) == "" {
+		return fmt.Errorf("block reason is required when transitioning to %s", StatusBlocked)
 	}
 
 	// Build update fields

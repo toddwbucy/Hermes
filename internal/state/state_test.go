@@ -273,6 +273,9 @@ func TestSetGitDiffMode_InitializesNilState(t *testing.T) {
 }
 
 func TestGetGitGraphEnabled_Default(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
 	current = nil
 	enabled := GetGitGraphEnabled()
 	if enabled {
@@ -281,6 +284,9 @@ func TestGetGitGraphEnabled_Default(t *testing.T) {
 }
 
 func TestGetGitGraphEnabled_Set(t *testing.T) {
+	originalCurrent := current
+	defer func() { current = originalCurrent }()
+
 	current = &State{GitGraphEnabled: true}
 	enabled := GetGitGraphEnabled()
 	if !enabled {
