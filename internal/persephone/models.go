@@ -49,9 +49,17 @@ type Task struct {
 	ParentKey   string    `json:"parent_key,omitempty"`
 	Acceptance  string    `json:"acceptance,omitempty"`
 	Minor       bool      `json:"minor,omitempty"`
-	BlockReason string    `json:"block_reason,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	BlockReason string     `json:"block_reason,omitempty"`
+	Notes       []TaskNote `json:"notes,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// TaskNote is a timestamped annotation on a task.
+type TaskNote struct {
+	Content   string    `json:"content"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Session represents a Persephone session node.

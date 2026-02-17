@@ -196,6 +196,29 @@ func (s *Store) TransitionTask(taskKey, newStatus, blockReason string) error {
 	return s.client.UpdateDocument("persephone_tasks", taskKey, fields)
 }
 
+// AppendNote atomically appends a note to a task's notes array.
+func (s *Store) AppendNote(taskKey string, note TaskNote) error {
+	aql := `FOR doc IN persephone_tasks
+		FILTER doc._key == @key
+		UPDATE doc WITH {
+			notes: PUSH(doc.notes == null ? [] : doc.notes, @note),
+			updated_at: @now
+		} IN persephone_tasks
+		RETURN NEW`
+	raw, err := s.client.Query(aql, map[string]any{
+		"key":  taskKey,
+		"note": note,
+		"now":  time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		return err
+	}
+	if len(raw) == 0 {
+		return fmt.Errorf("task not found: %s", taskKey)
+	}
+	return nil
+}
+
 // UpdateTaskField updates arbitrary fields on a task document.
 func (s *Store) UpdateTaskField(taskKey string, fields map[string]any) error {
 	return s.client.UpdateDocument("persephone_tasks", taskKey, fields)
