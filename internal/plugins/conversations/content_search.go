@@ -25,9 +25,9 @@ type ContentSearchState struct {
 
 // SessionSearchResult represents a session with matching messages.
 type SessionSearchResult struct {
-	Session   adapter.Session         // The session containing matches
-	Messages  []adapter.MessageMatch  // Messages with matches (from adapter search)
-	Collapsed bool                    // True if session is collapsed in view
+	Session   adapter.Session        // The session containing matches
+	Messages  []adapter.MessageMatch // Messages with matches (from adapter search)
+	Collapsed bool                   // True if session is collapsed in view
 }
 
 // ContentSearchDebounceMsg is sent after debounce delay to trigger search.
@@ -42,6 +42,7 @@ type ContentSearchResultsMsg struct {
 	Results      []SessionSearchResult // Search results by session
 	Error        error                 // Error if search failed
 	Query        string                // The query these results are for (td-5b9928)
+	Version      int                   // Debounce version to discard stale option changes
 	TotalMatches int                   // Total matches found before truncation (td-8e1a2b)
 	Truncated    bool                  // True if results were truncated (td-8e1a2b)
 }
@@ -97,7 +98,7 @@ func (s *ContentSearchState) FlatLen() int {
 		count++ // Session row
 		if !sr.Collapsed {
 			for _, mm := range sr.Messages {
-				count++ // Message row
+				count++                  // Message row
 				count += len(mm.Matches) // Match rows
 			}
 		}
