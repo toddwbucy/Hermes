@@ -22,3 +22,13 @@ debug.log
 
 # Hermes workspace config
 .hermes/
+
+# Sidecar runtime state
+.sidecar/
+
+# Claude Code project config
+.claude/
+
+# Screenshots
+*.png
+*.jpg
