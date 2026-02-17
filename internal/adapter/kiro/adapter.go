@@ -33,7 +33,10 @@ type Adapter struct {
 
 // New creates a new Kiro adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	dbPath := findKiroDB(home)
 	return &Adapter{
 		dbPath: dbPath,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -405,20 +406,12 @@ func newTestAdapter(t *testing.T) *Adapter {
 
 func getTestdataDir(t *testing.T) string {
 	t.Helper()
-	// Get the directory of this test file
-	_, filename, _, ok := runtimeCaller(0)
+	// Get the directory of this test file using runtime.Caller
+	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("failed to get test file location")
 	}
 	return filepath.Join(filepath.Dir(filename), "testdata")
-}
-
-// runtimeCaller is a wrapper for runtime.Caller to make testing easier
-func runtimeCaller(skip int) (pc uintptr, file string, line int, ok bool) {
-	// In real code, this would call runtime.Caller
-	// For testdata, we use a relative path approach
-	cwd, _ := os.Getwd()
-	return 0, filepath.Join(cwd, "adapter_test.go"), 0, true
 }
 
 // TestWithRealData tests against actual OpenCode data if available

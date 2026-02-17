@@ -142,9 +142,9 @@ func extractSessionID(path string) string {
 
 	// Fallback: if buffer was full, sessionId might be beyond buffer boundary
 	if n == bufSize {
-		// Read entire file as fallback
+		// Read entire file using already-open handle to avoid race with concurrent writes
 		_, _ = file.Seek(0, 0)
-		data, err := os.ReadFile(path)
+		data, err := io.ReadAll(file)
 		if err != nil {
 			return ""
 		}

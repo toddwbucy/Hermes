@@ -25,7 +25,9 @@ const (
 type Adapter struct {
 	storageDir     string
 	projectIndex   map[string]*Project // worktree path -> Project
+	projectsMu     sync.RWMutex        // protects projectIndex and projectsLoaded
 	sessionIndex   map[string]string   // sessionID -> project ID
+	sessionIdxMu   sync.Mutex          // protects sessionIndex
 	projectsLoaded bool                // true after loadProjects populates projectIndex
 	metaCache      map[string]sessionMetaCacheEntry
 	metaMu         sync.RWMutex // guards metaCache
@@ -41,7 +43,10 @@ type sessionMetaCacheEntry struct {
 
 // New creates a new OpenCode adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		home = os.TempDir()
+	}
 	storageDir := findOpenCodeStorageDir(home)
 	return &Adapter{
 		storageDir:   storageDir,
@@ -166,7 +171,9 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 
 	sessions := make([]adapter.Session, 0, len(entries))
 	seenPaths := make(map[string]struct{}, len(entries))
+	a.sessionIdxMu.Lock()
 	a.sessionIndex = make(map[string]string)
+	a.sessionIdxMu.Unlock()
 
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".json") {
@@ -187,7 +194,9 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 		}
 
 		// Store in index for Messages() lookup
+		a.sessionIdxMu.Lock()
 		a.sessionIndex[meta.SessionID] = projectID
+		a.sessionIdxMu.Unlock()
 
 		// Determine name - use title, first user message, or short ID
 		name := meta.Title
@@ -352,14 +361,20 @@ func (a *Adapter) findProjectID(projectRoot string) (string, error) {
 	absRoot = filepath.Clean(absRoot)
 
 	// Load and cache all projects once
-	if !a.projectsLoaded {
+	a.projectsMu.RLock()
+	loaded := a.projectsLoaded
+	a.projectsMu.RUnlock()
+	if !loaded {
 		if err := a.loadProjects(); err != nil {
 			return "", err
 		}
 	}
 
 	// Lookup in cache
-	if proj, ok := a.projectIndex[absRoot]; ok {
+	a.projectsMu.RLock()
+	proj, ok := a.projectIndex[absRoot]
+	a.projectsMu.RUnlock()
+	if ok {
 		return proj.ID, nil
 	}
 
@@ -368,6 +383,14 @@ func (a *Adapter) findProjectID(projectRoot string) (string, error) {
 
 // loadProjects loads all projects from storage/project/*.json and populates projectIndex.
 func (a *Adapter) loadProjects() error {
+	a.projectsMu.Lock()
+	defer a.projectsMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if a.projectsLoaded {
+		return nil
+	}
+
 	projectDir := filepath.Join(a.storageDir, "project")
 	entries, err := os.ReadDir(projectDir)
 	if err != nil {
@@ -428,13 +451,18 @@ func (a *Adapter) DiscoverRelatedProjectDirs(mainWorktreePath string) ([]string,
 	}
 
 	// Load projects if not already loaded
-	if !a.projectsLoaded {
+	a.projectsMu.RLock()
+	loaded := a.projectsLoaded
+	a.projectsMu.RUnlock()
+	if !loaded {
 		if err := a.loadProjects(); err != nil {
 			return nil, nil
 		}
 	}
 
 	var related []string
+	a.projectsMu.RLock()
+	defer a.projectsMu.RUnlock()
 	for worktreePath := range a.projectIndex {
 		// Check if this worktree path is related to our repo
 		base := filepath.Base(worktreePath)
@@ -635,7 +663,6 @@ func (a *Adapter) batchLoadAllParts(messageIDs []string) map[string]parsedParts 
 
 		var textParts []string
 		var toolUses []adapter.ToolUse
-		var thinkingBlocks []adapter.ThinkingBlock
 		var fileRefs []string
 		var patchFiles []string
 
@@ -680,11 +707,10 @@ func (a *Adapter) batchLoadAllParts(messageIDs []string) map[string]parsedParts 
 		}
 
 		result[msgID] = parsedParts{
-			content:        strings.Join(textParts, "\n"),
-			toolUses:       toolUses,
-			thinkingBlocks: thinkingBlocks,
-			fileRefs:       fileRefs,
-			patchFiles:     patchFiles,
+			content:    strings.Join(textParts, "\n"),
+			toolUses:   toolUses,
+			fileRefs:   fileRefs,
+			patchFiles: patchFiles,
 		}
 	}
 
@@ -738,15 +764,17 @@ func shortID(id string) string {
 	return id
 }
 
-// truncateTitle truncates text to maxLen, adding "..." if truncated.
+// truncateTitle truncates text to maxLen runes, adding "..." if truncated.
 // It also replaces newlines with spaces for display.
+// Uses rune-based length to avoid splitting multibyte UTF-8 characters.
 func truncateTitle(s string, maxLen int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.TrimSpace(s)
 
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
