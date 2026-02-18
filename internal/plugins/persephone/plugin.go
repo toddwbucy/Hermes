@@ -177,12 +177,13 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		if plugin.IsStale(p.ctx, msg) {
 			return p, nil
 		}
-		p.view = viewDetail
-		p.notesMdl = nil
 		if msg.err != nil {
 			p.ctx.Logger.Warn("persephone: note add failed", "error", msg.err)
+			// Keep modal open so user doesn't lose their draft
 			return p, appmsg.ShowToast("Error: "+msg.err.Error(), 3*time.Second)
 		}
+		p.view = viewDetail
+		p.notesMdl = nil
 		return p, tea.Batch(
 			p.fetchTasks(),
 			p.fetchTaskDetail(msg.taskKey),
