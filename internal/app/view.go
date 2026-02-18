@@ -695,7 +695,7 @@ func (m Model) footerHints() []footerHint {
 	// Plugin-specific hints first - they're more contextually relevant
 	var hints []footerHint
 	if p := m.ActivePlugin(); p != nil {
-		hints = m.pluginFooterHints(p, m.activeContext)
+		hints = append(hints, m.pluginFooterHints(p, m.activeContext)...)
 	}
 	// Then essential global hints
 	hints = append(hints, m.globalFooterHints()...)
@@ -935,3 +935,4 @@ func formatCommandName(cmd string) string {
 	name := strings.ReplaceAll(cmd, "-", " ")
 	return name
 }
+

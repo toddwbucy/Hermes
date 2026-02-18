@@ -56,6 +56,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refreshWorktreeCache()
 		}
 		m.ready = true
+		// Ensure activeContext reflects the initial plugin so footer hints render
+		m.updateContext()
 		// Reset diagnostics modal on resize (will be rebuilt on next render)
 		if m.showDiagnostics {
 			m.diagnosticsModalWidth = 0
