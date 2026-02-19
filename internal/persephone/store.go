@@ -148,7 +148,7 @@ var ValidTransitions = map[string][]string{
 	StatusOpen:       {StatusInProgress},
 	StatusInProgress: {StatusInReview, StatusBlocked, StatusOpen},
 	StatusBlocked:    {StatusInProgress, StatusOpen},
-	StatusInReview:   {StatusClosed, StatusInProgress},
+	StatusInReview:   {StatusClosed, StatusInProgress, StatusBlocked},
 	StatusClosed:     {StatusOpen},
 }
 

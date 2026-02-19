@@ -88,7 +88,7 @@ func (sm *statusModal) buildModal(screenWidth int) {
 		AddSection(modal.Text("Current: " + statusDisplayLabel(sm.currentStatus))).
 		AddSection(modal.Spacer()).
 		AddSection(modal.Text("Move to:")).
-		AddSection(modal.List("status-list", items, &sm.selectedIdx, modal.WithMaxVisible(5))).
+		AddSection(modal.List("status-list", items, &sm.selectedIdx, modal.WithMaxVisible(5), modal.WithPerItemFocus())).
 		AddSection(modal.Spacer()).
 		AddSection(modal.When(
 			func() bool { return sm.selectedStatus() == persephoneData.StatusBlocked },
@@ -113,7 +113,10 @@ func (sm *statusModal) render(background string, screenW, screenH int) string {
 
 // handleKey processes keyboard input. Returns action and cmd.
 func (sm *statusModal) handleKey(msg tea.KeyMsg) (action string, cmd tea.Cmd) {
-	sm.buildModal(sm.width)
+	// Don't call buildModal here — render() already builds it each frame.
+	// Calling buildModal(sm.width) would recompute modalW differently
+	// (sm.width is modalW, not screenW), triggering a rebuild that creates
+	// a fresh Modal with empty focusIDs, breaking all key routing.
 	if sm.m == nil {
 		return "", nil
 	}
