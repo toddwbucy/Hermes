@@ -224,6 +224,19 @@ func (s *Store) UpdateTaskField(taskKey string, fields map[string]any) error {
 	return s.client.UpdateDocument("persephone_tasks", taskKey, fields)
 }
 
+// CreateTask inserts a new task into the persephone_tasks collection.
+// Sets created_at and updated_at to now, defaults status to "open" if empty.
+// Returns the _key of the created task.
+func (s *Store) CreateTask(task Task) (string, error) {
+	now := time.Now().UTC()
+	task.CreatedAt = now
+	task.UpdatedAt = now
+	if task.Status == "" {
+		task.Status = StatusOpen
+	}
+	return s.client.InsertDocument("persephone_tasks", task)
+}
+
 // queryTyped executes an AQL query and unmarshals results into typed slice.
 func queryTyped[T any](client *arango.Client, aql string, bindVars map[string]any) ([]T, error) {
 	raw, err := client.Query(aql, bindVars)

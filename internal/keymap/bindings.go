@@ -222,6 +222,7 @@ func DefaultBindings() []Binding {
 		{Key: "C", Command: "toggle-category", Context: "conversations-sidebar"},
 		{Key: "W", Command: "toggle-workspace", Context: "conversations-sidebar"},
 		{Key: "R", Command: "resume-in-workspace", Context: "conversations-sidebar"},
+		{Key: "I", Command: "extract-insights", Context: "conversations-sidebar"},
 
 		// Conversations main context (two-pane mode, right pane focused)
 		{Key: "tab", Command: "switch-pane", Context: "conversations-main"},
@@ -240,6 +241,18 @@ func DefaultBindings() []Binding {
 		{Key: "y", Command: "yank-details", Context: "conversations-main"},
 		{Key: "Y", Command: "yank-resume", Context: "conversations-main"},
 		{Key: "R", Command: "resume-in-workspace", Context: "conversations-main"},
+		{Key: "I", Command: "extract-insights", Context: "conversations-main"},
+
+		// Conversations insights modal context
+		{Key: "esc", Command: "close", Context: "conversations-insights"},
+		{Key: "q", Command: "close", Context: "conversations-insights"},
+		{Key: "j", Command: "navigate", Context: "conversations-insights"},
+		{Key: "k", Command: "navigate", Context: "conversations-insights"},
+		{Key: "down", Command: "navigate", Context: "conversations-insights"},
+		{Key: "up", Command: "navigate", Context: "conversations-insights"},
+		{Key: " ", Command: "toggle", Context: "conversations-insights"},
+		{Key: "a", Command: "toggle-all", Context: "conversations-insights"},
+		{Key: "enter", Command: "create", Context: "conversations-insights"},
 
 		// File browser tree context
 		{Key: "tab", Command: "switch-pane", Context: "file-browser-tree"},
