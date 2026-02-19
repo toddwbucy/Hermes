@@ -74,7 +74,8 @@ func (nm *notesModal) render(background string, screenW, screenH int) string {
 
 // handleKey processes keyboard input. Returns action and cmd.
 func (nm *notesModal) handleKey(msg tea.KeyMsg) (action string, cmd tea.Cmd) {
-	nm.buildModal(nm.width)
+	// Don't call buildModal here — render() already builds it each frame.
+	// See status_modal.go for explanation of the width mismatch rebuild bug.
 	if nm.m == nil {
 		return "", nil
 	}

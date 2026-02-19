@@ -228,6 +228,9 @@ func (p *Plugin) handleKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 			p.board.moveRight()
 		case "r":
 			return p, p.fetchTasks()
+		case "o":
+			p.board.cycleSort()
+			return p, appmsg.ShowToast(fmt.Sprintf("Sort: %s", p.board.sortMode.Label()), 2*time.Second)
 		case "enter":
 			if task := p.board.selectedTask(); task != nil {
 				p.view = viewDetail
@@ -430,6 +433,7 @@ func (p *Plugin) Commands() []plugin.Command {
 			{ID: "nav", Name: "Navigate", Description: "Move cursor", Context: pluginID, Priority: 1},
 			{ID: "open", Name: "Open", Description: "View task detail", Context: pluginID, Priority: 2},
 			{ID: "refresh", Name: "Refresh", Description: "Refresh tasks", Context: pluginID, Priority: 3},
+			{ID: "sort", Name: "Sort", Description: "Cycle sort mode", Context: pluginID, Priority: 4},
 		}
 	case viewDetail:
 		return []plugin.Command{

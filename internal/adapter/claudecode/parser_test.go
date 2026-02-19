@@ -130,8 +130,8 @@ func TestParseSessionMetadata_ValidFile(t *testing.T) {
 	if meta.SessionID != "valid_session" {
 		t.Errorf("got SessionID %q, want %q", meta.SessionID, "valid_session")
 	}
-	if meta.MsgCount != 4 {
-		t.Errorf("got MsgCount %d, want 4", meta.MsgCount)
+	if meta.MsgCount != 5 {
+		t.Errorf("got MsgCount %d, want 5", meta.MsgCount)
 	}
 	if meta.CWD != "/home/user/project" {
 		t.Errorf("got CWD %q, want %q", meta.CWD, "/home/user/project")
@@ -192,8 +192,8 @@ func TestMessagesFromTestdata(t *testing.T) {
 
 	messages := parseMessagesFromFile(t, a, testFile)
 
-	if len(messages) != 4 {
-		t.Fatalf("got %d messages, want 4", len(messages))
+	if len(messages) != 5 {
+		t.Fatalf("got %d messages, want 5", len(messages))
 	}
 
 	// Check first message (user)
