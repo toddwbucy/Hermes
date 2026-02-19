@@ -413,6 +413,7 @@ func DefaultBindings() []Binding {
 		{Key: "q", Command: "back", Context: "persephone"},
 		{Key: "s", Command: "status", Context: "persephone"},
 		{Key: "n", Command: "note", Context: "persephone"},
+		{Key: "o", Command: "sort", Context: "persephone"},
 		{Key: "ctrl+s", Command: "save", Context: "persephone"},
 		{Key: "tab", Command: "select", Context: "persephone"},
 

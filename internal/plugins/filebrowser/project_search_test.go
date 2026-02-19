@@ -254,7 +254,7 @@ test.go:20:4:// Test comment
 other.go:5:5:var TestVar = 1`
 
 	reader := strings.NewReader(lineOutput)
-	results := parseRipgrepOutput(reader, 100, 4) // query "Test" has length 4
+	results := parseRipgrepOutput(reader, 100, 4, nil) // query "Test" has length 4
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 files, got %d", len(results))
@@ -293,7 +293,7 @@ func TestParseRipgrepOutput_MaxMatches(t *testing.T) {
 	}
 
 	reader := strings.NewReader(sb.String())
-	results := parseRipgrepOutput(reader, 10, 1) // Limit to 10, query length 1
+	results := parseRipgrepOutput(reader, 10, 1, nil) // Limit to 10, query length 1
 
 	totalMatches := 0
 	for _, f := range results {
