@@ -17,6 +17,7 @@ import (
 	"github.com/toddwbucy/hermes/internal/app"
 	"github.com/toddwbucy/hermes/internal/modal"
 	"github.com/toddwbucy/hermes/internal/mouse"
+	appmsg "github.com/toddwbucy/hermes/internal/msg"
 	"github.com/toddwbucy/hermes/internal/plugin"
 	"github.com/toddwbucy/hermes/internal/state"
 	"github.com/toddwbucy/hermes/internal/ui"
@@ -245,6 +246,10 @@ type Plugin struct {
 	contentSearchMode  bool                // True when content search modal is open
 	contentSearchState *ContentSearchState // Content search state
 
+	// Insight extraction modal state
+	showInsightModal  bool
+	insightModalState *insightModalState
+
 	// Pending scroll target after messages load (td-b74d9f)
 	// Uses message ID (not index) to handle pagination correctly
 	pendingScrollMsgID  string // Target message ID to scroll to after load ("" = none)
@@ -421,6 +426,10 @@ func (p *Plugin) resetState() {
 	p.contentSearchMode = false
 	p.contentSearchState = nil
 
+	// Insight modal state
+	p.showInsightModal = false
+	p.insightModalState = nil
+
 	// Pending scroll state (td-b74d9f)
 	p.pendingScrollMsgID = ""
 	p.pendingScrollActive = false
@@ -552,6 +561,11 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 		return p.handleMouse(msg)
 
 	case tea.KeyMsg:
+		// Handle insight modal first if open
+		if p.showInsightModal {
+			return p.handleInsightModalKey(msg)
+		}
+
 		// Handle content search modal first if open (td-6ac70a)
 		if p.contentSearchMode {
 			return p.handleContentSearchKey(msg)
@@ -1001,6 +1015,25 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 
 		return p, tea.Batch(cmds...)
 
+	case appmsg.InsightTasksCreatedMsg:
+		// Response from Persephone plugin after creating insight tasks
+		if plugin.IsStale(p.ctx, msg) {
+			return p, nil
+		}
+		if p.showInsightModal {
+			p.showInsightModal = false
+			p.insightModalState = nil
+			if msg.Err != nil {
+				return p, func() tea.Msg {
+					return app.ToastMsg{Message: "Error creating tasks: " + msg.Err.Error(), Duration: 3 * time.Second, IsError: true}
+				}
+			}
+			return p, func() tea.Msg {
+				return app.ToastMsg{Message: fmt.Sprintf("Created %d insight tasks", msg.Count), Duration: 3 * time.Second}
+			}
+		}
+		return p, nil
+
 	case tea.WindowSizeMsg:
 		p.width = msg.Width
 		p.height = msg.Height
@@ -1080,6 +1113,16 @@ func (p *Plugin) View(width, height int) string {
 	// Note: sidebarWidth is calculated in renderTwoPane, not here,
 	// to avoid resetting drag-adjusted widths on every render
 
+	// Handle insight modal overlay
+	if p.showInsightModal && p.insightModalState != nil {
+		background := p.renderTwoPane()
+		sessionName := p.selectedSessionName()
+		modalContent := renderInsightModal(p.insightModalState, sessionName, width, height)
+		return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(
+			ui.OverlayModal(background, modalContent, width, height),
+		)
+	}
+
 	// Handle content search modal overlay (td-6ac70a, td-435ae6)
 	if p.contentSearchMode && p.contentSearchState != nil {
 		background := p.renderTwoPane()
@@ -1118,6 +1161,15 @@ func (p *Plugin) SetFocused(f bool) { p.focused = f }
 
 // Commands returns the available commands.
 func (p *Plugin) Commands() []plugin.Command {
+	// Insight modal commands
+	if p.showInsightModal {
+		return []plugin.Command{
+			{ID: "close", Name: "Close", Description: "Close insights", Category: plugin.CategoryNavigation, Context: "conversations-insights", Priority: 1},
+			{ID: "toggle", Name: "Toggle", Description: "Toggle selection", Category: plugin.CategoryActions, Context: "conversations-insights", Priority: 2},
+			{ID: "create", Name: "Create", Description: "Create tasks", Category: plugin.CategoryActions, Context: "conversations-insights", Priority: 3},
+			{ID: "navigate", Name: "Nav", Description: "Navigate ↑/↓", Category: plugin.CategoryNavigation, Context: "conversations-insights", Priority: 4},
+		}
+	}
 	// Content search mode commands (td-6ac70a, td-2467e8: updated shortcuts)
 	if p.contentSearchMode {
 		return []plugin.Command{
@@ -1155,6 +1207,7 @@ func (p *Plugin) Commands() []plugin.Command {
 			{ID: "detail", Name: "Detail", Description: "View turn details", Category: plugin.CategoryView, Context: "conversations-main", Priority: 2},
 			{ID: "expand", Name: "Expand", Description: "Expand selected item", Category: plugin.CategoryView, Context: "conversations-main", Priority: 3},
 			{ID: "content-search", Name: "Find", Description: "Search content (F)", Category: plugin.CategorySearch, Context: "conversations-main", Priority: 3},
+			{ID: "extract-insights", Name: "Insights", Description: "Extract insights (I)", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 3},
 			{ID: "back", Name: "Back", Description: "Return to sidebar", Category: plugin.CategoryNavigation, Context: "conversations-main", Priority: 4},
 			{ID: "open", Name: "Open", Description: "Open in CLI", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 5},
 			{ID: "yank", Name: "Yank", Description: "Yank turn content", Category: plugin.CategoryActions, Context: "conversations-main", Priority: 6},
@@ -1182,6 +1235,10 @@ func (p *Plugin) Commands() []plugin.Command {
 
 // FocusContext returns the current focus context.
 func (p *Plugin) FocusContext() string {
+	// Insight modal takes precedence
+	if p.showInsightModal {
+		return "conversations-insights"
+	}
 	// Content search modal takes precedence (td-6ac70a)
 	if p.contentSearchMode {
 		return "conversations-content-search"
@@ -1252,6 +1309,17 @@ func (p *Plugin) Diagnostics() []plugin.Diagnostic {
 		{ID: "conversations", Status: status, Detail: detail},
 		{ID: "watcher", Status: watchStatus, Detail: "fsnotify"},
 	}
+}
+
+// selectedSessionName returns a display name for the currently selected session.
+func (p *Plugin) selectedSessionName() string {
+	if s := p.findSelectedSession(); s != nil {
+		if s.Slug != "" {
+			return s.Slug
+		}
+		return s.ID
+	}
+	return ""
 }
 
 // copySessionToClipboard copies the current session as markdown to clipboard.

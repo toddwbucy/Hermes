@@ -143,6 +143,30 @@ func (c *Client) UpdateDocument(collection, key string, fields map[string]any) e
 	return err
 }
 
+// InsertDocument creates a new document in the given collection.
+// Returns the _key of the created document.
+func (c *Client) InsertDocument(collection string, doc any) (string, error) {
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return "", fmt.Errorf("marshal document: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/_db/%s/_api/document/%s",
+		c.baseURL, url.PathEscape(c.database), url.PathEscape(collection))
+	resp, err := c.doRequest("POST", endpoint, data)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		Key string `json:"_key"`
+	}
+	if err := json.Unmarshal(resp, &result); err != nil {
+		return "", fmt.Errorf("unmarshal insert response: %w", err)
+	}
+	return result.Key, nil
+}
+
 // doRequest executes an HTTP request with auth.
 func (c *Client) doRequest(method, url string, body []byte) ([]byte, error) {
 	var bodyReader io.Reader

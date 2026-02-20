@@ -1,6 +1,7 @@
 package conversations
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -184,6 +185,20 @@ func (p *Plugin) updateSessions(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 	case "R":
 		// Open resume modal for workspace
 		return p, p.openResumeModal()
+
+	case "I":
+		// Open insight extraction modal (loads messages first if needed)
+		if p.selectedSession != "" {
+			if len(p.turns) == 0 {
+				// Messages not loaded yet — load first, then user can retry
+				return p, tea.Batch(
+					p.loadMessages(p.selectedSession),
+					appmsg.ShowToast("Loading messages... press I again", 2*time.Second),
+				)
+			}
+			return p.openInsightModal()
+		}
+		return p, appmsg.ShowToast("No session selected", 2*time.Second)
 	}
 
 	return p, nil
@@ -748,12 +763,140 @@ func (p *Plugin) updateMessages(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
 		// Open resume modal for workspace
 		return p, p.openResumeModal()
 
+	case "I":
+		// Open insight extraction modal
+		return p.openInsightModal()
+
 	case "F":
 		// Open content search modal (td-6ac70a)
 		return p.openContentSearch()
 	}
 
 	return p, nil
+}
+
+// openInsightModal opens the insight extraction modal for the current conversation.
+func (p *Plugin) openInsightModal() (plugin.Plugin, tea.Cmd) {
+	if len(p.turns) == 0 {
+		return p, appmsg.ShowToast("No conversation loaded", 2*time.Second)
+	}
+
+	insights := extractInsights(p.turns)
+	p.insightModalState = &insightModalState{
+		insights: insights,
+		cursor:   0,
+	}
+	p.showInsightModal = true
+	return p, nil
+}
+
+// handleInsightModalKey handles key events when the insight modal is open.
+func (p *Plugin) handleInsightModalKey(msg tea.KeyMsg) (plugin.Plugin, tea.Cmd) {
+	if p.insightModalState == nil {
+		p.showInsightModal = false
+		return p, nil
+	}
+	state := p.insightModalState
+
+	switch msg.String() {
+	case "esc", "q":
+		p.showInsightModal = false
+		p.insightModalState = nil
+
+	case "j", "down":
+		if state.cursor < len(state.insights)-1 {
+			state.cursor++
+		}
+
+	case "k", "up":
+		if state.cursor > 0 {
+			state.cursor--
+		}
+
+	case "g":
+		state.cursor = 0
+
+	case "G":
+		if len(state.insights) > 0 {
+			state.cursor = len(state.insights) - 1
+		}
+
+	case " ":
+		// Toggle selection on current insight
+		if state.cursor >= 0 && state.cursor < len(state.insights) {
+			state.insights[state.cursor].Selected = !state.insights[state.cursor].Selected
+			// Auto-advance cursor
+			if state.cursor < len(state.insights)-1 {
+				state.cursor++
+			}
+		}
+
+	case "a":
+		// Toggle select all / deselect all
+		state.allSelect = !state.allSelect
+		for i := range state.insights {
+			state.insights[i].Selected = state.allSelect
+		}
+
+	case "enter":
+		// Create tasks from selected insights
+		return p.createInsightTasks()
+	}
+
+	return p, nil
+}
+
+// createInsightTasks emits a CreateInsightTasksMsg for the Persephone plugin to handle.
+func (p *Plugin) createInsightTasks() (plugin.Plugin, tea.Cmd) {
+	if p.insightModalState == nil {
+		return p, nil
+	}
+
+	var tasks []appmsg.InsightTask
+	sessionName := p.selectedSessionName()
+
+	for _, ins := range p.insightModalState.insights {
+		if !ins.Selected {
+			continue
+		}
+		// Build title: frame as a discussion point
+		preview := firstLine(ins.Text)
+		if len([]rune(preview)) > 65 {
+			preview = string([]rune(preview)[:62]) + "..."
+		}
+		title := "Discuss: " + preview
+
+		// Build description as a discussion prompt with context
+		desc := "## Discussion Point\n\n"
+		desc += ins.Text
+		desc += "\n\n## Context\n\n"
+		if sessionName != "" {
+			desc += fmt.Sprintf("- **Source**: conversation %q, turn %d\n", sessionName, ins.TurnIndex+1)
+		}
+		desc += fmt.Sprintf("- **Type**: %s\n", ins.Source.Badge())
+		desc += "\n## Prompt\n\n"
+		desc += "Review this insight and discuss whether it should be formalized into the knowledge graph. "
+		desc += "Consider: Is this validated? What nodes/edges would it create? Does it connect to existing knowledge?"
+
+		tasks = append(tasks, appmsg.InsightTask{
+			Title:       title,
+			Description: desc,
+		})
+	}
+
+	if len(tasks) == 0 {
+		return p, appmsg.ShowToast("No insights selected", 2*time.Second)
+	}
+
+	// Emit the message for Persephone plugin to handle
+	epoch := p.ctx.Epoch
+	return p, func() tea.Msg {
+		return appmsg.CreateInsightTasksMsg{
+			Tasks:       tasks,
+			SessionName: sessionName,
+			Epoch:       epoch,
+		}
+	}
 }
 
 // updateDetailMode handles key events when in detail mode (two-pane).

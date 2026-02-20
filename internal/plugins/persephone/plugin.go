@@ -203,6 +203,21 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 			appmsg.ShowToast(fmt.Sprintf("Status → %s", msg.newStatus), 2*time.Second),
 		)
 
+	case appmsg.CreateInsightTasksMsg:
+		// Create Persephone tasks from conversation insights
+		if plugin.IsStale(p.ctx, msg) {
+			return p, nil
+		}
+		if !p.connected || p.store == nil {
+			return p, func() tea.Msg {
+				return appmsg.InsightTasksCreatedMsg{
+					Err:   fmt.Errorf("persephone not connected"),
+					Epoch: msg.Epoch,
+				}
+			}
+		}
+		return p, p.createInsightTasks(msg)
+
 	case plugin.PluginFocusedMsg:
 		if p.connected {
 			return p, p.fetchTasks()
@@ -573,6 +588,28 @@ func (p *Plugin) transitionTask(taskKey, newStatus, blockReason string) tea.Cmd 
 	return func() tea.Msg {
 		err := store.TransitionTask(taskKey, newStatus, blockReason)
 		return taskStatusChangedMsg{taskKey: taskKey, newStatus: newStatus, err: err}
+	}
+}
+
+func (p *Plugin) createInsightTasks(msg appmsg.CreateInsightTasksMsg) tea.Cmd {
+	store := p.store
+	epoch := msg.Epoch
+	return func() tea.Msg {
+		created := 0
+		for _, it := range msg.Tasks {
+			task := persephoneData.Task{
+				Title:       it.Title,
+				Description: it.Description,
+				Type:        persephoneData.TypeTask,
+				Priority:    persephoneData.PriorityMedium,
+				Labels:      []string{"insight", "discussion", "prompt-queue"},
+			}
+			if _, err := store.CreateTask(task); err != nil {
+				return appmsg.InsightTasksCreatedMsg{Count: created, Err: err, Epoch: epoch}
+			}
+			created++
+		}
+		return appmsg.InsightTasksCreatedMsg{Count: created, Epoch: epoch}
 	}
 }
 
