@@ -889,10 +889,12 @@ func (p *Plugin) createInsightTasks() (plugin.Plugin, tea.Cmd) {
 	}
 
 	// Emit the message for Persephone plugin to handle
+	epoch := p.ctx.Epoch
 	return p, func() tea.Msg {
 		return appmsg.CreateInsightTasksMsg{
 			Tasks:       tasks,
 			SessionName: sessionName,
+			Epoch:       epoch,
 		}
 	}
 }

@@ -1017,6 +1017,9 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 
 	case appmsg.InsightTasksCreatedMsg:
 		// Response from Persephone plugin after creating insight tasks
+		if plugin.IsStale(p.ctx, msg) {
+			return p, nil
+		}
 		if p.showInsightModal {
 			p.showInsightModal = false
 			p.insightModalState = nil
@@ -1115,7 +1118,9 @@ func (p *Plugin) View(width, height int) string {
 		background := p.renderTwoPane()
 		sessionName := p.selectedSessionName()
 		modalContent := renderInsightModal(p.insightModalState, sessionName, width, height)
-		return ui.OverlayModal(background, modalContent, width, height)
+		return lipgloss.NewStyle().Width(width).Height(height).MaxHeight(height).Render(
+			ui.OverlayModal(background, modalContent, width, height),
+		)
 	}
 
 	// Handle content search modal overlay (td-6ac70a, td-435ae6)

@@ -205,10 +205,14 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 
 	case appmsg.CreateInsightTasksMsg:
 		// Create Persephone tasks from conversation insights
+		if plugin.IsStale(p.ctx, msg) {
+			return p, nil
+		}
 		if !p.connected || p.store == nil {
 			return p, func() tea.Msg {
 				return appmsg.InsightTasksCreatedMsg{
-					Err: fmt.Errorf("Persephone not connected"),
+					Err:   fmt.Errorf("persephone not connected"),
+					Epoch: msg.Epoch,
 				}
 			}
 		}
@@ -589,6 +593,7 @@ func (p *Plugin) transitionTask(taskKey, newStatus, blockReason string) tea.Cmd 
 
 func (p *Plugin) createInsightTasks(msg appmsg.CreateInsightTasksMsg) tea.Cmd {
 	store := p.store
+	epoch := msg.Epoch
 	return func() tea.Msg {
 		created := 0
 		for _, it := range msg.Tasks {
@@ -600,11 +605,11 @@ func (p *Plugin) createInsightTasks(msg appmsg.CreateInsightTasksMsg) tea.Cmd {
 				Labels:      []string{"insight", "discussion", "prompt-queue"},
 			}
 			if _, err := store.CreateTask(task); err != nil {
-				return appmsg.InsightTasksCreatedMsg{Count: created, Err: err}
+				return appmsg.InsightTasksCreatedMsg{Count: created, Err: err, Epoch: epoch}
 			}
 			created++
 		}
-		return appmsg.InsightTasksCreatedMsg{Count: created}
+		return appmsg.InsightTasksCreatedMsg{Count: created, Epoch: epoch}
 	}
 }
 

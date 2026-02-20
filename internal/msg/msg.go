@@ -34,11 +34,19 @@ type InsightTask struct {
 type CreateInsightTasksMsg struct {
 	Tasks       []InsightTask
 	SessionName string
+	Epoch       uint64
 }
+
+// GetEpoch implements plugin.EpochMessage for staleness detection.
+func (m CreateInsightTasksMsg) GetEpoch() uint64 { return m.Epoch }
 
 // InsightTasksCreatedMsg is emitted by the Persephone plugin after processing
 // a CreateInsightTasksMsg. Broadcast back to conversations plugin.
 type InsightTasksCreatedMsg struct {
 	Count int
 	Err   error
+	Epoch uint64
 }
+
+// GetEpoch implements plugin.EpochMessage for staleness detection.
+func (m InsightTasksCreatedMsg) GetEpoch() uint64 { return m.Epoch }
