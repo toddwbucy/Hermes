@@ -128,13 +128,17 @@ func extractInsightBlocks(lines []string, turnIdx int) []Insight {
 		if insightHeaderRe.MatchString(line) {
 			// Find the content between delimiters
 			contentStart := i + 1
-			// Skip to first delimiter if header is on same line
-			for contentStart < len(lines) {
-				if insightDelimiterRe.MatchString(strings.TrimSpace(lines[contentStart])) {
+			// The combined format (`★ Insight ─────`) has the header and opening
+			// delimiter on the same line. Only search for a separate opening
+			// delimiter if the header line itself doesn't contain them.
+			if !strings.ContainsAny(line, "─━") {
+				for contentStart < len(lines) {
+					if insightDelimiterRe.MatchString(strings.TrimSpace(lines[contentStart])) {
+						contentStart++
+						break
+					}
 					contentStart++
-					break
 				}
-				contentStart++
 			}
 			// Collect until closing delimiter
 			var contentLines []string
