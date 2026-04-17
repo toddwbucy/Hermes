@@ -84,14 +84,20 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 			continue
 		}
 		spans, err := readSpans(p)
-		if err != nil {
+		// A scanner error after some good lines still returns those lines —
+		// keep the partial trace rather than dropping the whole file. Only
+		// skip when nothing parsed.
+		if err != nil && len(spans) == 0 {
 			continue
 		}
 
 		runID := sessionIDFromSpans(spans, p)
 		newIndex[runID] = p
 
-		first, last := spanTimeRange(spans)
+		// File mtime is the right fallback for spanless or malformed traces.
+		// Using time.Now() would make broken sessions look freshly active and
+		// sort to the top of the list.
+		first, last := spanTimeRange(spans, info.ModTime().UTC())
 		inputTok, outputTok := aggregateTokens(spans)
 		msgCount := countKind(spans, "LLM")
 
@@ -209,10 +215,9 @@ func sessionIDFromSpans(spans []Span, path string) string {
 	return strings.TrimPrefix(base, "trace-")
 }
 
-func spanTimeRange(spans []Span) (time.Time, time.Time) {
+func spanTimeRange(spans []Span, fallback time.Time) (time.Time, time.Time) {
 	if len(spans) == 0 {
-		now := time.Now()
-		return now, now
+		return fallback, fallback
 	}
 	var first, last uint64
 	first = spans[0].StartTimeUnixNano

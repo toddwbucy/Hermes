@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/toddwbucy/hermes/internal/adapter"
 )
@@ -166,6 +167,78 @@ func TestUsage(t *testing.T) {
 	}
 	if stats.MessageCount != 2 {
 		t.Errorf("MessageCount: got %d, want 2", stats.MessageCount)
+	}
+}
+
+func TestSessionsKeepsPartialTraces(t *testing.T) {
+	// A trace file that mixes valid spans with a malformed line should
+	// still surface as a session — readSpans tolerates bad lines, and
+	// Sessions must not drop the file just because scanner.Err is non-nil
+	// or because some lines were skipped.
+	a := New()
+	root := t.TempDir()
+	logs := filepath.Join(root, "logs")
+	if err := os.MkdirAll(logs, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(logs, "trace-partial.jsonl")
+	mustWrite(t, path, `{"traceId":"00000000000000000000000000000001","spanId":"0000000000000001","name":"good","startTimeUnixNano":1700000000000000000,"endTimeUnixNano":1700000001000000000,"attributes":{"openinference.span.kind":"AGENT"},"status":{"code":"OK"},"resource":{"service.name":"x","weaver.run_id":"run_partial","openinference.spec_version":"1.0"},"scope":{"name":"weaver-trace","version":"0.1.0"}}
+{not valid json
+`)
+
+	sessions, err := a.Sessions(root)
+	if err != nil {
+		t.Fatalf("Sessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("partial trace should still surface a session, got %d", len(sessions))
+	}
+	if sessions[0].ID != "run_partial" {
+		t.Errorf("session ID: got %q, want run_partial", sessions[0].ID)
+	}
+}
+
+func TestSessionsEmptyTraceUsesFileMtimeNotNow(t *testing.T) {
+	// A trace file with no parseable spans must not show a recent
+	// CreatedAt/UpdatedAt — that would make broken sessions look freshly
+	// active. The file's mtime is the right anchor.
+	a := New()
+	root := t.TempDir()
+	logs := filepath.Join(root, "logs")
+	if err := os.MkdirAll(logs, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(logs, "trace-empty.jsonl")
+	mustWrite(t, path, "")
+
+	// Backdate the file so we can prove the session inherits its mtime.
+	old := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	before := time.Now()
+	sessions, err := a.Sessions(root)
+	if err != nil {
+		t.Fatalf("Sessions: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("empty trace should still surface as a session, got %d", len(sessions))
+	}
+
+	s := sessions[0]
+	// UpdatedAt should sit near the file's mtime, well before "now".
+	if s.UpdatedAt.After(before) {
+		t.Errorf("UpdatedAt should not be after Sessions() was called: %v vs %v", s.UpdatedAt, before)
+	}
+	// 1 hour of slop on either side of the backdated mtime.
+	if s.UpdatedAt.Before(old.Add(-time.Hour)) || s.UpdatedAt.After(old.Add(time.Hour)) {
+		t.Errorf("UpdatedAt should be near the file mtime (%v), got %v", old, s.UpdatedAt)
+	}
+	// Empty session must NOT be marked active — that would mislead the UI
+	// into thinking a broken/abandoned trace is live.
+	if s.IsActive {
+		t.Errorf("empty session should not be IsActive")
 	}
 }
 
