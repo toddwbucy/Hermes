@@ -242,6 +242,94 @@ func TestSessionsEmptyTraceUsesFileMtimeNotNow(t *testing.T) {
 	}
 }
 
+func TestSessionsDisambiguatesDuplicateRunIDs(t *testing.T) {
+	// Two trace files with the same run_id (e.g., user copied a fixture
+	// or HEROBENCH_RUN_ID was reused) must each surface as their own
+	// session, not silently shadow each other in sessionIndex.
+	a := New()
+	root := t.TempDir()
+	logs := filepath.Join(root, "logs")
+	if err := os.MkdirAll(logs, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	src, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logs, "trace-first.jsonl"), src, 0644); err != nil {
+		t.Fatalf("write first: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logs, "trace-second.jsonl"), src, 0644); err != nil {
+		t.Fatalf("write second: %v", err)
+	}
+
+	sessions, err := a.Sessions(root)
+	if err != nil {
+		t.Fatalf("Sessions: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("want 2 sessions (no shadowing), got %d", len(sessions))
+	}
+
+	ids := map[string]bool{}
+	for _, s := range sessions {
+		if ids[s.ID] {
+			t.Errorf("duplicate session ID %q — disambiguation failed", s.ID)
+		}
+		ids[s.ID] = true
+	}
+
+	// Each unique ID must resolve to its own file when Messages is called.
+	for _, s := range sessions {
+		msgs, err := a.Messages(s.ID)
+		if err != nil {
+			t.Fatalf("Messages(%s): %v", s.ID, err)
+		}
+		if len(msgs) == 0 {
+			t.Errorf("Messages(%s) returned empty — likely path collision", s.ID)
+		}
+	}
+}
+
+func TestMessagesAndUsagePreservePartialTraces(t *testing.T) {
+	// If readSpans returns parsed spans plus a non-fatal error, Messages
+	// and Usage must still surface the parsed content. A malformed line
+	// alone won't trigger scanner.Err (readSpans tolerates it), but the
+	// guard `len(spans) == 0` is what matters: a partial result must not
+	// be discarded just because err != nil. We exercise the success path
+	// against a partial trace as the most realistic check.
+	a := New()
+	root := t.TempDir()
+	logs := filepath.Join(root, "logs")
+	if err := os.MkdirAll(logs, 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(logs, "trace-partial-msg.jsonl")
+	mustWrite(t, path, `{"traceId":"00000000000000000000000000000001","spanId":"0000000000000001","name":"chain","startTimeUnixNano":1700000000000000000,"endTimeUnixNano":1700000001000000000,"attributes":{"openinference.span.kind":"CHAIN"},"status":{"code":"OK"},"resource":{"service.name":"x","weaver.run_id":"run_partial_msg","openinference.spec_version":"1.0"},"scope":{"name":"weaver-trace","version":"0.1.0"}}
+{"traceId":"00000000000000000000000000000001","spanId":"0000000000000002","parentSpanId":"0000000000000001","name":"llm","startTimeUnixNano":1700000002000000000,"endTimeUnixNano":1700000003000000000,"attributes":{"openinference.span.kind":"LLM","llm.model_name":"qwen3","llm.token_count.prompt":100,"llm.token_count.completion":50},"status":{"code":"OK"},"resource":{"service.name":"x","weaver.run_id":"run_partial_msg","openinference.spec_version":"1.0"},"scope":{"name":"weaver-trace","version":"0.1.0"}}
+{this is broken json
+`)
+
+	if _, err := a.Sessions(root); err != nil {
+		t.Fatalf("Sessions: %v", err)
+	}
+	msgs, err := a.Messages("run_partial_msg")
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("want 1 LLM message from partial trace, got %d", len(msgs))
+	}
+	stats, err := a.Usage("run_partial_msg")
+	if err != nil {
+		t.Fatalf("Usage: %v", err)
+	}
+	if stats.TotalInputTokens != 100 || stats.TotalOutputTokens != 50 {
+		t.Errorf("partial-trace usage: got %d/%d, want 100/50",
+			stats.TotalInputTokens, stats.TotalOutputTokens)
+	}
+}
+
 func TestWatchReturnsClosedChannel(t *testing.T) {
 	a := New()
 	ch, closer, err := a.Watch(t.TempDir())

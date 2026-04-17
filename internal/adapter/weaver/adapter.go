@@ -92,6 +92,13 @@ func (a *Adapter) Sessions(projectRoot string) ([]adapter.Session, error) {
 		}
 
 		runID := sessionIDFromSpans(spans, p)
+		// Disambiguate duplicate run_ids (e.g., same trace file copied,
+		// or HEROBENCH_RUN_ID reused across runs) by appending the file
+		// stem. Without this, the second file silently shadows the first
+		// in sessionIndex and Messages/Usage resolve the wrong path.
+		if prev, exists := newIndex[runID]; exists && prev != p {
+			runID = runID + "::" + strings.TrimSuffix(filepath.Base(p), ".jsonl")
+		}
 		newIndex[runID] = p
 
 		// File mtime is the right fallback for spanless or malformed traces.
@@ -139,7 +146,10 @@ func (a *Adapter) Messages(sessionID string) ([]adapter.Message, error) {
 		return nil, nil
 	}
 	spans, err := readSpans(path)
-	if err != nil {
+	// Mirror Sessions(): keep partial traces. A scanner error after some
+	// good lines still yields usable spans — surface them rather than
+	// failing the whole call.
+	if err != nil && len(spans) == 0 {
 		return nil, err
 	}
 	return buildMessages(spans), nil
@@ -152,7 +162,7 @@ func (a *Adapter) Usage(sessionID string) (*adapter.UsageStats, error) {
 		return &adapter.UsageStats{}, nil
 	}
 	spans, err := readSpans(path)
-	if err != nil {
+	if err != nil && len(spans) == 0 {
 		return nil, err
 	}
 	inputTok, outputTok := aggregateTokens(spans)
